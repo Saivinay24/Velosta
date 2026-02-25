@@ -1,16 +1,24 @@
 'use client'
 
 import { useTravelStore } from '@/lib/store'
+import PersistentMap from '@/components/PersistentMap'
+import CloudOverlay from '@/components/CloudOverlay'
 import BudgetFilter from '@/components/BudgetFilter'
 import MapView from '@/components/MapView'
 import ItineraryBuilder from '@/components/ItineraryBuilder'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function Home() {
   const { currentStep, isTransitioning } = useTravelStore()
 
   return (
-    <main className="min-h-screen bg-ivory">
+    <main className="min-h-screen bg-ivory" style={{ position: 'relative', overflow: 'hidden' }}>
+      {/* Persistent Mapbox — always rendered, never unmounted */}
+      <PersistentMap />
+
+      {/* Cloud overlay — always rendered at root, dissolves during intro */}
+      <CloudOverlay />
+
       {/* Transition overlay */}
       <AnimatePresence>
         {isTransitioning && (
@@ -30,11 +38,40 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence mode="wait">
-        {currentStep === 1 && <BudgetFilter key="budget" />}
-        {currentStep === 2 && <MapView key="map" />}
-        {currentStep === 3 && <ItineraryBuilder key="itinerary" />}
-      </AnimatePresence>
+      {/* Step UI layers — always mounted, visibility controlled */}
+      {/* pointer-events: none on wrappers so map pin clicks pass through */}
+      <div
+        style={{
+          position: 'fixed', inset: 0, zIndex: 10,
+          opacity: currentStep === 1 ? 1 : 0,
+          pointerEvents: currentStep === 1 ? 'auto' : 'none',
+          transition: 'opacity 0.6s ease',
+        }}
+      >
+        <BudgetFilter />
+      </div>
+
+      <div
+        style={{
+          position: 'fixed', inset: 0, zIndex: currentStep === 2 ? 10 : 5,
+          opacity: currentStep === 2 ? 1 : 0,
+          pointerEvents: 'none', // Let map pins receive clicks
+          transition: 'opacity 0.6s ease',
+        }}
+      >
+        <MapView />
+      </div>
+
+      <div
+        style={{
+          position: 'fixed', inset: 0, zIndex: currentStep === 3 ? 10 : 5,
+          opacity: currentStep === 3 ? 1 : 0,
+          pointerEvents: currentStep === 3 ? 'auto' : 'none',
+          transition: 'opacity 0.6s ease',
+        }}
+      >
+        <ItineraryBuilder />
+      </div>
     </main>
   )
 }

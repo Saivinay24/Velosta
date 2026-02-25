@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import mapboxgl from 'mapbox-gl'
 import type {
   Destination,
   Itinerary,
@@ -10,6 +11,12 @@ import type {
 } from './types'
 
 interface TravelState {
+  // Shared map
+  mapRef: mapboxgl.Map | null
+  setMapRef: (map: mapboxgl.Map | null) => void
+  mapLoaded: boolean
+  setMapLoaded: (loaded: boolean) => void
+
   // Step 1: User preferences
   budgetValue: number
   setBudgetValue: (value: number) => void
@@ -47,6 +54,12 @@ interface TravelState {
 }
 
 export const useTravelStore = create<TravelState>((set, get) => ({
+  // Shared map
+  mapRef: null,
+  setMapRef: (map) => set({ mapRef: map }),
+  mapLoaded: false,
+  setMapLoaded: (loaded) => set({ mapLoaded: loaded }),
+
   budgetValue: 50000,
   setBudgetValue: (value) => set({ budgetValue: value }),
 
@@ -115,6 +128,7 @@ export const useTravelStore = create<TravelState>((set, get) => ({
       activeDay: 1,
       currentStep: 1,
       isTransitioning: false,
+      mapLoaded: false,
     }),
 
   getUserPreferences: () => {

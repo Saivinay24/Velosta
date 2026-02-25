@@ -21,10 +21,6 @@ import {
   Star,
 } from 'lucide-react'
 
-// Set token - this will show in console if undefined
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-mapboxgl.accessToken = MAPBOX_TOKEN || ''
-
 const categoryIcons: Record<string, React.ReactNode> = {
   nature: <Mountain className="w-3.5 h-3.5" />,
   culture: <Landmark className="w-3.5 h-3.5" />,
@@ -33,16 +29,13 @@ const categoryIcons: Record<string, React.ReactNode> = {
 }
 
 export default function MapView() {
-  const mapContainer = useRef<HTMLDivElement>(null)
-  const map = useRef<mapboxgl.Map | null>(null)
   const [hoveredDestination, setHoveredDestination] = useState<Destination | null>(null)
   const [selectedCard, setSelectedCard] = useState<Destination | null>(null)
-  const [mapLoaded, setMapLoaded] = useState(false)
-  const [mapError, setMapError] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const markersRef = useRef<mapboxgl.Marker[]>([])
   const hoveredRef = useRef<Destination | null>(null)
   const sourceAddedRef = useRef(false)
+  const layersAddedRef = useRef(false)
 
   const {
     budgetValue,
@@ -53,6 +46,9 @@ export default function MapView() {
     goToPreviousStep,
     setSelectedDestination,
     goToNextStep,
+    mapRef,
+    mapLoaded,
+    currentStep,
   } = useTravelStore()
 
   // Filter destinations
@@ -65,233 +61,143 @@ export default function MapView() {
     return dests
   }, [budgetValue, tripType, selectedCategories])
 
-  // Initialize map — use mercator projection for stable pin placement
+  // ──── Build pins when step 2 is active ────
   useEffect(() => {
-    if (!mapContainer.current || map.current) return
-    if (!MAPBOX_TOKEN) {
-      setMapError('Mapbox token is missing! Add it to .env.local')
-      return
-    }
+    if (!mapRef || !mapLoaded || currentStep !== 2) return
 
-    try {
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/light-v11',
-        center: [78.9629, 22.5937], // India center
-        zoom: 4.2,
-        projection: 'mercator' as any,
-        pitch: 0,
-        bearing: 0,
-        trackResize: true,
+    const m = mapRef
+
+    // Wait for the camera transition to settle
+    const addPinsTimer = setTimeout(() => {
+      // Cleanup old HTML hit-target markers
+      markersRef.current.forEach((mk) => mk.remove())
+      markersRef.current = []
+
+      // Remove old layers/sources if they exist
+      try { if (m.getLayer('dest-pins-glow')) m.removeLayer('dest-pins-glow') } catch { }
+      try { if (m.getLayer('dest-pins')) m.removeLayer('dest-pins') } catch { }
+      try { if (m.getLayer('dest-pins-border')) m.removeLayer('dest-pins-border') } catch { }
+      try { if (m.getSource('dest-pins-source')) m.removeSource('dest-pins-source') } catch { }
+      sourceAddedRef.current = false
+
+      // Build GeoJSON features
+      const features = filteredDestinations.map((dest) => {
+        const dayFit = getDayFitColor(dest, tripDays)
+        const pinSize = dest.popularityScore > 90 ? 10 : dest.popularityScore > 85 ? 8 : 7
+        return {
+          type: 'Feature' as const,
+          properties: { id: dest.id, color: dayFit.color, size: pinSize },
+          geometry: { type: 'Point' as const, coordinates: [dest.location.lng, dest.location.lat] },
+        }
       })
 
-      map.current.on('load', () => {
-        if (!map.current) return
+      m.addSource('dest-pins-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features },
+      })
+      sourceAddedRef.current = true
 
-        // Force a resize so the canvas fills its container properly
-        map.current.resize()
-        setMapLoaded(true)
-
-        // Apply warm fog/atmosphere
-        try {
-          map.current.setFog({
-            color: '#F6F3EE',
-            'high-color': '#E8DFD2',
-            'horizon-blend': 0.08,
-            'space-color': '#F6F3EE',
-            'star-intensity': 0,
-          } as any)
-        } catch {}
+      // Glow layer
+      m.addLayer({
+        id: 'dest-pins-glow', type: 'circle', source: 'dest-pins-source',
+        paint: {
+          'circle-radius': ['get', 'size'], 'circle-color': ['get', 'color'],
+          'circle-opacity': 0.25, 'circle-blur': 0.8,
+        },
       })
 
-      map.current.on('error', (e) => {
-        setMapError(`Map error: ${e.error?.message || 'Unknown'}`)
+      // White border layer
+      m.addLayer({
+        id: 'dest-pins-border', type: 'circle', source: 'dest-pins-source',
+        paint: {
+          'circle-radius': ['+', ['get', 'size'], 2],
+          'circle-color': '#FDFCFA', 'circle-opacity': 1,
+        },
       })
 
-      map.current.addControl(
-        new mapboxgl.NavigationControl({ showCompass: true, visualizePitch: true }),
-        'bottom-right'
-      )
+      // Main pin circle
+      m.addLayer({
+        id: 'dest-pins', type: 'circle', source: 'dest-pins-source',
+        paint: {
+          'circle-radius': ['get', 'size'], 'circle-color': ['get', 'color'],
+          'circle-opacity': 1,
+        },
+      })
+      layersAddedRef.current = true
 
-      // Resize again after initial render to handle any layout shifts
-      setTimeout(() => {
-        if (map.current) map.current.resize()
-      }, 200)
-    } catch (error: any) {
-      setMapError(`Failed to load map: ${error.message}`)
-    }
+      // Invisible hit-targets
+      filteredDestinations.forEach((dest) => {
+        const hitTarget = document.createElement('div')
+        hitTarget.style.cssText = `width:32px;height:32px;cursor:pointer;background:transparent;border-radius:50%;`
+
+        hitTarget.addEventListener('mouseenter', () => {
+          hoveredRef.current = dest
+          setHoveredDestination(dest)
+          if (mapRef) {
+            mapRef.setPaintProperty('dest-pins', 'circle-radius', [
+              'case', ['==', ['get', 'id'], dest.id], ['+', ['get', 'size'], 3], ['get', 'size'],
+            ])
+            mapRef.setPaintProperty('dest-pins-glow', 'circle-radius', [
+              'case', ['==', ['get', 'id'], dest.id], ['+', ['get', 'size'], 8], ['get', 'size'],
+            ])
+            mapRef.setPaintProperty('dest-pins-glow', 'circle-opacity', [
+              'case', ['==', ['get', 'id'], dest.id], 0.45, 0.25,
+            ])
+          }
+        })
+
+        hitTarget.addEventListener('mouseleave', () => {
+          setTimeout(() => {
+            if (hoveredRef.current === dest) {
+              hoveredRef.current = null
+              setHoveredDestination(null)
+            }
+          }, 50)
+          if (mapRef) {
+            mapRef.setPaintProperty('dest-pins', 'circle-radius', ['get', 'size'])
+            mapRef.setPaintProperty('dest-pins-glow', 'circle-radius', ['get', 'size'])
+            mapRef.setPaintProperty('dest-pins-glow', 'circle-opacity', 0.25)
+          }
+        })
+
+        hitTarget.addEventListener('click', (e) => {
+          e.stopPropagation()
+          setSelectedCard(dest)
+          if (mapRef) {
+            mapRef.flyTo({
+              center: [dest.location.lng, dest.location.lat],
+              zoom: 9, duration: 2000, curve: 1.5, pitch: 0,
+              easing: (t: number) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t),
+            })
+          }
+        })
+
+        const marker = new mapboxgl.Marker({ element: hitTarget, anchor: 'center' })
+          .setLngLat([dest.location.lng, dest.location.lat])
+          .addTo(m)
+        markersRef.current.push(marker)
+      })
+    }, 500) // Wait for camera flyTo to begin
 
     return () => {
-      markersRef.current.forEach((m) => m.remove())
-      markersRef.current = []
-      sourceAddedRef.current = false
-      if (map.current) {
-        map.current.remove()
-        map.current = null
-      }
+      clearTimeout(addPinsTimer)
     }
-  }, [])
+  }, [filteredDestinations, tripDays, mapLoaded, currentStep, mapRef])
 
-  // ──── Build pins using native Mapbox GeoJSON layers (not HTML markers) ────
-  // This ensures pins are rendered as part of the map tiles and NEVER drift on zoom/pan.
-  // We add a small invisible HTML marker per pin just for hover/click interactivity.
+  // ──── Cleanup pins when leaving step 2 ────
   useEffect(() => {
-    if (!map.current || !mapLoaded) return
-
-    // Cleanup old HTML hit-target markers
-    markersRef.current.forEach((m) => m.remove())
-    markersRef.current = []
-
-    const m = map.current
-
-    // Remove old layers/sources if they exist
-    try { if (m.getLayer('dest-pins-glow')) m.removeLayer('dest-pins-glow') } catch {}
-    try { if (m.getLayer('dest-pins')) m.removeLayer('dest-pins') } catch {}
-    try { if (m.getLayer('dest-pins-border')) m.removeLayer('dest-pins-border') } catch {}
-    try { if (m.getSource('dest-pins-source')) m.removeSource('dest-pins-source') } catch {}
-    sourceAddedRef.current = false
-
-    // Build GeoJSON features for each destination
-    const features = filteredDestinations.map((dest) => {
-      const dayFit = getDayFitColor(dest, tripDays)
-      const pinSize = dest.popularityScore > 90 ? 10 : dest.popularityScore > 85 ? 8 : 7
-      return {
-        type: 'Feature' as const,
-        properties: {
-          id: dest.id,
-          color: dayFit.color,
-          size: pinSize,
-        },
-        geometry: {
-          type: 'Point' as const,
-          coordinates: [dest.location.lng, dest.location.lat],
-        },
-      }
-    })
-
-    // Add GeoJSON source
-    m.addSource('dest-pins-source', {
-      type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features,
-      },
-    })
-    sourceAddedRef.current = true
-
-    // Glow layer (outer soft ring)
-    m.addLayer({
-      id: 'dest-pins-glow',
-      type: 'circle',
-      source: 'dest-pins-source',
-      paint: {
-        'circle-radius': ['get', 'size'],
-        'circle-color': ['get', 'color'],
-        'circle-opacity': 0.25,
-        'circle-blur': 0.8,
-      },
-    })
-
-    // White border layer
-    m.addLayer({
-      id: 'dest-pins-border',
-      type: 'circle',
-      source: 'dest-pins-source',
-      paint: {
-        'circle-radius': ['+', ['get', 'size'], 2],
-        'circle-color': '#FDFCFA',
-        'circle-opacity': 1,
-      },
-    })
-
-    // Main pin circle layer
-    m.addLayer({
-      id: 'dest-pins',
-      type: 'circle',
-      source: 'dest-pins-source',
-      paint: {
-        'circle-radius': ['get', 'size'],
-        'circle-color': ['get', 'color'],
-        'circle-opacity': 1,
-      },
-    })
-
-    // Create invisible HTML hit-targets for hover/click
-    filteredDestinations.forEach((dest) => {
-      const hitTarget = document.createElement('div')
-      hitTarget.style.cssText = `
-        width: 32px; height: 32px;
-        cursor: pointer;
-        background: transparent;
-        border-radius: 50%;
-      `
-
-      hitTarget.addEventListener('mouseenter', () => {
-        hoveredRef.current = dest
-        setHoveredDestination(dest)
-        // Highlight the pin on the native layer
-        if (map.current) {
-          map.current.setPaintProperty('dest-pins', 'circle-radius', [
-            'case',
-            ['==', ['get', 'id'], dest.id],
-            ['+', ['get', 'size'], 3],
-            ['get', 'size'],
-          ])
-          map.current.setPaintProperty('dest-pins-glow', 'circle-radius', [
-            'case',
-            ['==', ['get', 'id'], dest.id],
-            ['+', ['get', 'size'], 8],
-            ['get', 'size'],
-          ])
-          map.current.setPaintProperty('dest-pins-glow', 'circle-opacity', [
-            'case',
-            ['==', ['get', 'id'], dest.id],
-            0.45,
-            0.25,
-          ])
-        }
-      })
-
-      hitTarget.addEventListener('mouseleave', () => {
-        setTimeout(() => {
-          if (hoveredRef.current === dest) {
-            hoveredRef.current = null
-            setHoveredDestination(null)
-          }
-        }, 50)
-        // Reset pin sizes
-        if (map.current) {
-          map.current.setPaintProperty('dest-pins', 'circle-radius', ['get', 'size'])
-          map.current.setPaintProperty('dest-pins-glow', 'circle-radius', ['get', 'size'])
-          map.current.setPaintProperty('dest-pins-glow', 'circle-opacity', 0.25)
-        }
-      })
-
-      hitTarget.addEventListener('click', (e) => {
-        e.stopPropagation()
-        setSelectedCard(dest)
-        if (map.current) {
-          map.current.flyTo({
-            center: [dest.location.lng, dest.location.lat],
-            zoom: 9,
-            duration: 2000,
-            curve: 1.5,
-            pitch: 0,
-            easing: (t: number) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t),
-          })
-        }
-      })
-
-      const marker = new mapboxgl.Marker({
-        element: hitTarget,
-        anchor: 'center',
-      })
-        .setLngLat([dest.location.lng, dest.location.lat])
-        .addTo(m)
-
-      markersRef.current.push(marker)
-    })
-  }, [filteredDestinations, tripDays, mapLoaded])
+    if (currentStep !== 2 && mapRef && layersAddedRef.current) {
+      // Remove pin layers and markers so they don't show in step 1 or 3
+      markersRef.current.forEach((mk) => mk.remove())
+      markersRef.current = []
+      try { if (mapRef.getLayer('dest-pins-glow')) mapRef.removeLayer('dest-pins-glow') } catch { }
+      try { if (mapRef.getLayer('dest-pins')) mapRef.removeLayer('dest-pins') } catch { }
+      try { if (mapRef.getLayer('dest-pins-border')) mapRef.removeLayer('dest-pins-border') } catch { }
+      try { if (mapRef.getSource('dest-pins-source')) mapRef.removeSource('dest-pins-source') } catch { }
+      sourceAddedRef.current = false
+      layersAddedRef.current = false
+    }
+  }, [currentStep, mapRef])
 
   const handleSelectDestination = (dest: Destination) => {
     setSelectedDestination(dest)
@@ -300,57 +206,21 @@ export default function MapView() {
 
   const resetMapView = () => {
     setSelectedCard(null)
-    map.current?.flyTo({
+    mapRef?.flyTo({
       center: [78.9629, 22.5937],
-      zoom: 4.2,
-      pitch: 0,
-      bearing: 0,
-      duration: 1500,
+      zoom: 4.2, pitch: 0, bearing: 0, duration: 1500,
     })
   }
 
-  // Force map resize when component mounts / becomes visible
-  useEffect(() => {
-    if (!map.current || !mapLoaded) return
-    // After Framer Motion animation completes, force resize so canvas fills container
-    const timer = setTimeout(() => {
-      if (map.current) map.current.resize()
-    }, 900) // slightly after the 0.8s entry animation
-    return () => clearTimeout(timer)
-  }, [mapLoaded])
-
   return (
-    // CRITICAL: Do NOT use `scale` in exit/animate — it breaks Mapbox's
-    // internal coordinate ↔ pixel mapping, causing pins to drift on zoom.
-    // Only use opacity for transitions.
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
-      className="relative h-screen w-full overflow-hidden"
-    >
-      {/* Map Container */}
-      <div
-        ref={mapContainer}
-        className="absolute inset-0"
-        style={{ backgroundColor: '#F6F3EE' }}
-      />
-
-      {/* Error Display */}
-      {mapError && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl z-50 max-w-md">
-          <h3 className="font-bold mb-1">Map Error</h3>
-          <p className="text-sm">{mapError}</p>
-        </div>
-      )}
-
+    <div className="relative h-screen w-full overflow-hidden">
       {/* Top Bar */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
+        animate={{ opacity: currentStep === 2 ? 1 : 0, y: currentStep === 2 ? 0 : -20 }}
         transition={{ delay: 0.3, duration: 0.6 }}
         className="absolute top-0 left-0 right-0 glass-panel p-4 z-10"
+        style={{ pointerEvents: currentStep === 2 ? 'auto' : 'none' }}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <button
@@ -373,9 +243,8 @@ export default function MapView() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`p-2 rounded-lg transition-all duration-300 ${
-                showFilters ? 'bg-charcoal text-warm-white' : 'text-charcoal-light hover:bg-beige/60'
-              }`}
+              className={`p-2 rounded-lg transition-all duration-300 ${showFilters ? 'bg-charcoal text-warm-white' : 'text-charcoal-light hover:bg-beige/60'
+                }`}
             >
               <Filter className="w-4 h-4" />
             </button>
@@ -388,7 +257,7 @@ export default function MapView() {
         </div>
       </motion.div>
 
-      {/* Filter Panel (collapsible) */}
+      {/* Filter Panel */}
       <AnimatePresence>
         {showFilters && (
           <motion.div
@@ -397,6 +266,7 @@ export default function MapView() {
             exit={{ opacity: 0, y: -10, height: 0 }}
             transition={{ duration: 0.3 }}
             className="absolute top-[72px] left-0 right-0 glass-panel border-t border-sandstone/15 px-4 py-3 z-10"
+            style={{ pointerEvents: 'auto' }}
           >
             <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-2">
               {([
@@ -408,11 +278,10 @@ export default function MapView() {
                 <button
                   key={cat.id}
                   onClick={() => toggleCategory(cat.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
-                    selectedCategories.includes(cat.id)
-                      ? 'bg-charcoal text-warm-white'
-                      : 'bg-beige/60 text-charcoal-light hover:bg-sandstone/30'
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${selectedCategories.includes(cat.id)
+                    ? 'bg-charcoal text-warm-white'
+                    : 'bg-beige/60 text-charcoal-light hover:bg-sandstone/30'
+                    }`}
                 >
                   {cat.icon}
                   {cat.label}
@@ -423,12 +292,13 @@ export default function MapView() {
         )}
       </AnimatePresence>
 
-      {/* Budget & Duration Info Chips */}
+      {/* Budget & Duration Chips */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
+        animate={{ opacity: currentStep === 2 ? 1 : 0, x: currentStep === 2 ? 0 : -20 }}
         transition={{ delay: 0.5, duration: 0.6 }}
         className="absolute top-20 left-4 glass-panel rounded-2xl px-4 py-2.5 z-10"
+        style={{ pointerEvents: 'auto' }}
       >
         <p className="text-[10px] text-charcoal-light/50 mb-0.5">Budget</p>
         <p className="text-base font-serif font-semibold text-charcoal">
@@ -438,9 +308,10 @@ export default function MapView() {
 
       <motion.div
         initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
+        animate={{ opacity: currentStep === 2 ? 1 : 0, x: currentStep === 2 ? 0 : 20 }}
         transition={{ delay: 0.6, duration: 0.6 }}
         className="absolute top-20 right-4 glass-panel rounded-2xl px-4 py-2.5 z-10"
+        style={{ pointerEvents: 'auto' }}
       >
         <p className="text-[10px] text-charcoal-light/50 mb-0.5">Duration</p>
         <p className="text-base font-serif font-semibold text-charcoal">{tripDays} Days</p>
@@ -454,7 +325,7 @@ export default function MapView() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
             transition={{ duration: 0.2 }}
-            className="absolute bottom-24 left-1/2 -translate-x-1/2 glass-panel rounded-2xl p-5 z-20 min-w-[300px] max-w-[360px] pointer-events-none"
+            className="absolute bottom-24 left-1/2 -translate-x-1/2 glass-panel rounded-2xl p-5 z-20 min-w-[300px] max-w-[360px]"
           >
             <div className="flex items-start gap-4">
               <div
@@ -490,7 +361,6 @@ export default function MapView() {
                   </span>
                 </div>
 
-                {/* Day Fit Indicator */}
                 <div
                   className="text-xs px-2.5 py-1 rounded-lg mb-3 inline-flex items-center gap-1.5"
                   style={{
@@ -524,6 +394,7 @@ export default function MapView() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-charcoal/30 backdrop-blur-sm flex items-center justify-center z-30 p-4"
+            style={{ pointerEvents: 'auto' }}
             onClick={resetMapView}
           >
             <motion.div
@@ -577,9 +448,7 @@ export default function MapView() {
 
               {/* Highlights */}
               <div className="mb-6">
-                <h3 className="font-medium text-charcoal text-xs mb-3 tracking-wide uppercase">
-                  Highlights
-                </h3>
+                <h3 className="font-medium text-charcoal text-xs mb-3 tracking-wide uppercase">Highlights</h3>
                 <div className="space-y-2">
                   {selectedCard.tripDetails.highlights.map((h) => (
                     <div key={h} className="flex items-center gap-3 text-charcoal-light">
@@ -590,17 +459,12 @@ export default function MapView() {
                 </div>
               </div>
 
-              {/* Top POIs Preview */}
+              {/* Top POIs */}
               <div className="mb-8">
-                <h3 className="font-medium text-charcoal text-xs mb-3 tracking-wide uppercase">
-                  Top Places
-                </h3>
+                <h3 className="font-medium text-charcoal text-xs mb-3 tracking-wide uppercase">Top Places</h3>
                 <div className="flex flex-wrap gap-2">
                   {selectedCard.pois.slice(0, 4).map((poi) => (
-                    <div
-                      key={poi.id}
-                      className="bg-beige/50 px-3 py-1.5 rounded-lg text-xs text-charcoal-light"
-                    >
+                    <div key={poi.id} className="bg-beige/50 px-3 py-1.5 rounded-lg text-xs text-charcoal-light">
                       <MapPin className="w-3 h-3 inline mr-1 text-gold" />
                       {poi.name}
                     </div>
@@ -614,11 +478,10 @@ export default function MapView() {
                   {selectedCard.tripDetails.bestFor.map((bt) => (
                     <span
                       key={bt}
-                      className={`text-xs px-2.5 py-1 rounded-full capitalize ${
-                        bt === tripType
-                          ? 'bg-gold/20 text-charcoal font-medium border border-gold/30'
-                          : 'bg-beige/40 text-charcoal-light/60'
-                      }`}
+                      className={`text-xs px-2.5 py-1 rounded-full capitalize ${bt === tripType
+                        ? 'bg-gold/20 text-charcoal font-medium border border-gold/30'
+                        : 'bg-beige/40 text-charcoal-light/60'
+                        }`}
                     >
                       {bt}
                     </span>
@@ -654,9 +517,10 @@ export default function MapView() {
       {/* Legend */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        animate={{ opacity: currentStep === 2 ? 1 : 0, y: currentStep === 2 ? 0 : 20 }}
         transition={{ delay: 0.8, duration: 0.6 }}
         className="absolute bottom-8 left-4 glass-panel rounded-2xl p-4 z-10"
+        style={{ pointerEvents: 'auto' }}
       >
         <h3 className="font-medium text-charcoal mb-2.5 text-xs tracking-wide uppercase">
           Day Compatibility
@@ -678,30 +542,27 @@ export default function MapView() {
       </motion.div>
 
       {/* No destinations message */}
-      {filteredDestinations.length === 0 && mapLoaded && (
+      {filteredDestinations.length === 0 && mapLoaded && currentStep === 2 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass-panel rounded-2xl p-8 z-10 text-center max-w-sm"
+          style={{ pointerEvents: 'auto' }}
         >
           <p className="text-2xl mb-2">😔</p>
-          <h3 className="font-serif font-semibold text-lg text-charcoal mb-2">
-            No trips found
-          </h3>
+          <h3 className="font-serif font-semibold text-lg text-charcoal mb-2">No trips found</h3>
           <p className="text-sm text-charcoal-light/60 mb-4">
             Try adjusting your budget, days, or filters to discover more destinations.
           </p>
           <button
             onClick={goToPreviousStep}
             className="px-4 py-2 rounded-lg text-sm font-medium text-warm-white"
-            style={{
-              background: 'linear-gradient(135deg, #C4734F 0%, #C9A96E 100%)',
-            }}
+            style={{ background: 'linear-gradient(135deg, #C4734F 0%, #C9A96E 100%)' }}
           >
             Adjust Preferences
           </button>
         </motion.div>
       )}
-    </motion.div>
+    </div>
   )
 }

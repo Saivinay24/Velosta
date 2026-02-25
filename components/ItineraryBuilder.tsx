@@ -46,8 +46,6 @@ import {
   Check,
 } from 'lucide-react'
 
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
-
 const activityIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   transport: Bus,
   accommodation: Home,
@@ -93,13 +91,11 @@ function SortableActivity({
   return (
     <div
       ref={setNodeRef}
-      className={`bg-warm-white rounded-xl p-3.5 transition-all duration-300 border-l-[3px] ${
-        isDragging ? 'shadow-lg ring-1 ring-gold/30' : 'shadow-sm hover:shadow-md'
-      }`}
+      className={`bg-warm-white rounded-xl p-3.5 transition-all duration-300 border-l-[3px] ${isDragging ? 'shadow-lg ring-1 ring-gold/30' : 'shadow-sm hover:shadow-md'
+        }`}
       style={{ ...style, borderLeftColor: borderColor } as React.CSSProperties}
     >
       <div className="flex items-start gap-2.5">
-        {/* Drag Handle */}
         <div
           {...attributes}
           {...listeners}
@@ -108,7 +104,6 @@ function SortableActivity({
           <GripVertical className="w-4 h-4" />
         </div>
 
-        {/* Icon */}
         <div
           className="p-2 rounded-lg flex-shrink-0"
           style={{ backgroundColor: `${borderColor}15` }}
@@ -116,7 +111,6 @@ function SortableActivity({
           <Icon className="w-4 h-4 text-terracotta" />
         </div>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-0.5">
             <div className="min-w-0">
@@ -237,39 +231,31 @@ export default function ItineraryBuilder() {
     activeDay,
     setActiveDay,
     goToPreviousStep,
+    mapRef,
+    mapLoaded,
+    currentStep,
   } = useTravelStore()
 
-  const [isGenerating, setIsGenerating] = useState(true)
+  const [isGenerating, setIsGenerating] = useState(false)
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [showBreakdown, setShowBreakdown] = useState(false)
   const [shareMsg, setShareMsg] = useState('')
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
-  const [mapInitialized, setMapInitialized] = useState(false)
+  const [hasGenerated, setHasGenerated] = useState(false)
 
-  const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapInstance = useRef<mapboxgl.Map | null>(null)
   const routeMarkers = useRef<mapboxgl.Marker[]>([])
-  const mapInitAttempted = useRef(false)
+  const routeLayersRef = useRef<string[]>([])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  // ──── Generate itinerary ────
+  // ──── Generate itinerary when entering step 3 ────
   useEffect(() => {
-    if (!selectedDestination) return
-    setIsGenerating(true)
-    setMapInitialized(false)
-    mapInitAttempted.current = false
+    if (currentStep !== 3 || !selectedDestination || hasGenerated) return
 
-    // Cleanup any existing map from a previous destination
-    if (mapInstance.current) {
-      routeMarkers.current.forEach((m) => m.remove())
-      routeMarkers.current = []
-      mapInstance.current.remove()
-      mapInstance.current = null
-    }
+    setIsGenerating(true)
 
     const prefs = {
       budget: budgetValue,
@@ -278,7 +264,6 @@ export default function ItineraryBuilder() {
       categories: selectedCategories,
     }
 
-    // Try AI API first, then fall back to local engine
     const generateWithAI = async () => {
       try {
         const response = await fetch('/api/itinerary/generate', {
@@ -295,9 +280,7 @@ export default function ItineraryBuilder() {
 
         const data = await response.json()
 
-        // If the API returned valid days data (from OpenAI), use it
         if (data.days && Array.isArray(data.days) && data.days.length > 0 && !data.useLocalEngine) {
-          // Ensure all nodes have proper location and nodeId
           const aiDays: DayPlan[] = data.days.map((day: any, dIdx: number) => ({
             day: day.day || dIdx + 1,
             theme: day.theme || `Day ${dIdx + 1}`,
@@ -315,8 +298,6 @@ export default function ItineraryBuilder() {
       } catch (err) {
         console.warn('AI itinerary generation failed, using local engine:', err)
       }
-
-      // Fall back to local engine
       return null
     }
 
@@ -325,188 +306,29 @@ export default function ItineraryBuilder() {
       setDays(generated)
       setActiveDay(1)
       setIsGenerating(false)
+      setHasGenerated(true)
     })
+  }, [currentStep, selectedDestination])
 
-    return () => {
-      // Cleanup handled by the map cleanup effect
-    }
-  }, [selectedDestination, budgetValue, tripDays, tripType])
-
-  // ──── Initialize 3D city map ────
-  // Uses a polling approach: once isGenerating is false,
-  // we poll for the DOM container to appear, then init the map.
-  // This avoids the fragile single-timeout approach.
+  // Reset hasGenerated when destination changes
   useEffect(() => {
-    if (isGenerating || !selectedDestination || mapInitAttempted.current) return
+    setHasGenerated(false)
+  }, [selectedDestination])
 
-    const dest = selectedDestination
-    let cancelled = false
-    let pollCount = 0
-    const maxPolls = 30 // 3 seconds max
-
-    const tryInit = () => {
-      if (cancelled) return
-      pollCount++
-
-      const container = mapContainerRef.current
-      if (!container) {
-        if (pollCount < maxPolls) {
-          setTimeout(tryInit, 100)
-        } else {
-          console.error('Map container never appeared in DOM after 3s')
-        }
-        return
-      }
-
-      // Make sure container has dimensions
-      if (container.offsetWidth === 0 || container.offsetHeight === 0) {
-        if (pollCount < maxPolls) {
-          setTimeout(tryInit, 100)
-        }
-        return
-      }
-
-      mapInitAttempted.current = true
-
-      try {
-        const m = new mapboxgl.Map({
-          container: container,
-          style: 'mapbox://styles/mapbox/light-v11',
-          center: [dest.location.lng, dest.location.lat],
-          zoom: 14,
-          pitch: 55,
-          bearing: -15,
-          trackResize: true,
-          attributionControl: false,
-        })
-
-        mapInstance.current = m
-
-        m.on('load', () => {
-          if (cancelled || !mapInstance.current) return
-
-          // Force resize after a small delay to ensure layout is settled
-          setTimeout(() => {
-            if (mapInstance.current) mapInstance.current.resize()
-          }, 50)
-
-          // Warm atmosphere
-          try {
-            m.setFog({
-              color: '#F6F3EE',
-              'high-color': '#E8DFD2',
-              'horizon-blend': 0.06,
-              'space-color': '#F6F3EE',
-              'star-intensity': 0,
-            } as any)
-          } catch {}
-
-          // Add 3D building extrusion layer
-          const layers = m.getStyle().layers
-          let labelLayerId: string | undefined
-          if (layers) {
-            for (const layer of layers) {
-              if (layer.type === 'symbol' && layer.layout && (layer.layout as any)['text-field']) {
-                labelLayerId = layer.id
-                break
-              }
-            }
-          }
-
-          try {
-            m.addLayer({
-              id: '3d-buildings',
-              source: 'composite',
-              'source-layer': 'building',
-              filter: ['==', 'extrude', 'true'],
-              type: 'fill-extrusion',
-              minzoom: 12,
-              paint: {
-                'fill-extrusion-color': '#E8DFD2',
-                'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, ['get', 'height']],
-                'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, ['get', 'min_height']],
-                'fill-extrusion-opacity': 0.5,
-              },
-            }, labelLayerId)
-          } catch {}
-
-          // Cinematic entry: fly to the city from slightly offset
-          m.flyTo({
-            center: [dest.location.lng, dest.location.lat],
-            zoom: 14,
-            pitch: 55,
-            bearing: -15,
-            duration: 2000,
-            curve: 1.2,
-          })
-
-          setMapInitialized(true)
-        })
-
-        m.on('error', (e) => {
-          console.error('Itinerary map error:', e)
-        })
-
-        m.addControl(
-          new mapboxgl.NavigationControl({ showCompass: true, visualizePitch: true }),
-          'top-right'
-        )
-      } catch (err) {
-        console.error('Failed to initialize itinerary map:', err)
-      }
-    }
-
-    // Start polling after a microtask to let React commit the render
-    requestAnimationFrame(() => {
-      if (!cancelled) tryInit()
-    })
-
-    return () => { cancelled = true }
-  }, [isGenerating, selectedDestination])
-
-  // Cleanup map on unmount & handle resizes
+  // ──── Update markers & routes on the shared map ────
   useEffect(() => {
-    // Resize observer to keep map in sync with container size changes
-    const container = mapContainerRef.current
-    let resizeObserver: ResizeObserver | null = null
-
-    if (container) {
-      resizeObserver = new ResizeObserver(() => {
-        if (mapInstance.current) {
-          mapInstance.current.resize()
-        }
-      })
-      resizeObserver.observe(container)
-    }
-
-    return () => {
-      resizeObserver?.disconnect()
-      routeMarkers.current.forEach((m) => m.remove())
-      routeMarkers.current = []
-      if (mapInstance.current) {
-        mapInstance.current.remove()
-        mapInstance.current = null
-      }
-    }
-  }, [])
-
-  // ──── Update markers & routes on map ────
-  useEffect(() => {
-    if (!mapInstance.current || !mapInitialized || days.length === 0) return
+    if (!mapRef || !mapLoaded || currentStep !== 3 || days.length === 0 || isGenerating) return
 
     // Remove old markers
     routeMarkers.current.forEach((m) => m.remove())
     routeMarkers.current = []
 
     // Remove old route layers/sources
-    days.forEach((_, dayIndex) => {
-      const sourceId = `route-day-${dayIndex + 1}`
-      const layerId = `route-line-day-${dayIndex + 1}`
-      try {
-        if (mapInstance.current!.getLayer(layerId)) mapInstance.current!.removeLayer(layerId)
-        if (mapInstance.current!.getSource(sourceId)) mapInstance.current!.removeSource(sourceId)
-      } catch {}
+    routeLayersRef.current.forEach((id) => {
+      try { if (mapRef.getLayer(id)) mapRef.removeLayer(id) } catch { }
+      try { if (mapRef.getSource(id)) mapRef.removeSource(id) } catch { }
     })
+    routeLayersRef.current = []
 
     const dayColors = ['#C9A96E', '#D4B57E', '#BF9D5E', '#C4734F', '#3b82f6']
 
@@ -521,8 +343,6 @@ export default function ItineraryBuilder() {
         const isActive = dayPlan.day === activeDay
         const size = isActive ? 34 : 26
 
-        // Outer wrapper — Mapbox controls its `transform` for positioning.
-        // NEVER set transform on this element or it will break positioning.
         const el = document.createElement('div')
         el.style.cssText = `
           width:${size + 12}px;height:${size + 12}px;
@@ -530,7 +350,6 @@ export default function ItineraryBuilder() {
           display:flex;align-items:center;justify-content:center;
         `
 
-        // Inner visual — we can safely transform THIS without affecting Mapbox positioning
         const inner = document.createElement('div')
         inner.style.cssText = `
           width:${size}px;height:${size}px;border-radius:50%;
@@ -547,7 +366,6 @@ export default function ItineraryBuilder() {
 
         el.appendChild(inner)
 
-        // Hover scales the INNER element only — outer stays untouched by Mapbox
         el.addEventListener('mouseenter', () => {
           inner.style.transform = 'scale(1.3)'
           inner.style.boxShadow = `0 6px 20px rgba(201,169,110,0.7)`
@@ -560,7 +378,7 @@ export default function ItineraryBuilder() {
 
         const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
           .setLngLat([lng, lat])
-          .addTo(mapInstance.current!)
+          .addTo(mapRef)
 
         routeMarkers.current.push(marker)
       })
@@ -570,9 +388,9 @@ export default function ItineraryBuilder() {
       const layerId = `route-line-day-${dayPlan.day}`
       const color = dayColors[Math.min(dayIndex, dayColors.length - 1)]
 
-      if (dayCoords.length >= 2 && mapInstance.current!.isStyleLoaded()) {
+      if (dayCoords.length >= 2 && mapRef.isStyleLoaded()) {
         try {
-          mapInstance.current!.addSource(sourceId, {
+          mapRef.addSource(sourceId, {
             type: 'geojson',
             data: {
               type: 'Feature',
@@ -581,7 +399,7 @@ export default function ItineraryBuilder() {
             },
           })
 
-          mapInstance.current!.addLayer({
+          mapRef.addLayer({
             id: layerId,
             type: 'line',
             source: sourceId,
@@ -593,6 +411,9 @@ export default function ItineraryBuilder() {
               'line-dasharray': dayPlan.day === activeDay ? [1, 0] : [2, 2],
             },
           })
+
+          routeLayersRef.current.push(layerId)
+          routeLayersRef.current.push(sourceId)
         } catch (e) {
           console.warn('Route layer error:', e)
         }
@@ -611,7 +432,7 @@ export default function ItineraryBuilder() {
           (b, c) => b.extend(c),
           new mapboxgl.LngLatBounds(coords[0], coords[0])
         )
-        mapInstance.current.fitBounds(bounds, {
+        mapRef.fitBounds(bounds, {
           padding: { top: 80, bottom: 80, left: 80, right: 80 },
           maxZoom: 14,
           duration: 1000,
@@ -619,16 +440,26 @@ export default function ItineraryBuilder() {
           bearing: -15,
         })
       } else if (coords.length === 1) {
-        mapInstance.current.flyTo({
+        mapRef.flyTo({
           center: coords[0],
-          zoom: 14,
-          pitch: 50,
-          bearing: -15,
-          duration: 1000,
+          zoom: 14, pitch: 50, bearing: -15, duration: 1000,
         })
       }
     }
-  }, [activeDay, days, selectedDestination, mapInitialized])
+  }, [activeDay, days, selectedDestination, mapLoaded, currentStep, isGenerating, mapRef])
+
+  // ──── Cleanup markers when leaving step 3 ────
+  useEffect(() => {
+    if (currentStep !== 3 && mapRef) {
+      routeMarkers.current.forEach((m) => m.remove())
+      routeMarkers.current = []
+      routeLayersRef.current.forEach((id) => {
+        try { if (mapRef.getLayer(id)) mapRef.removeLayer(id) } catch { }
+        try { if (mapRef.getSource(id)) mapRef.removeSource(id) } catch { }
+      })
+      routeLayersRef.current = []
+    }
+  }, [currentStep, mapRef])
 
   // ──── Drag & Drop ────
   const handleDragStart = (event: DragStartEvent) => {
@@ -653,7 +484,6 @@ export default function ItineraryBuilder() {
     const newDays = [...days]
 
     if (sourceDayIdx === targetDayIdx) {
-      // Same-day reorder
       const dayNodes = [...newDays[sourceDayIdx].nodes]
       const oldIdx = dayNodes.findIndex((n) => n.nodeId === active.id)
       const newIdx = dayNodes.findIndex((n) => n.nodeId === over.id)
@@ -662,7 +492,6 @@ export default function ItineraryBuilder() {
         nodes: arrayMove(dayNodes, oldIdx, newIdx),
       }
     } else {
-      // Cross-day move
       const sourceNodes = [...newDays[sourceDayIdx].nodes]
       const movingIdx = sourceNodes.findIndex((n) => n.nodeId === active.id)
       const [movedNode] = sourceNodes.splice(movingIdx, 1)
@@ -676,7 +505,6 @@ export default function ItineraryBuilder() {
 
     setDays(newDays)
 
-    // Simulate optimization
     setIsOptimizing(true)
     await new Promise((r) => setTimeout(r, 600))
     setIsOptimizing(false)
@@ -717,13 +545,9 @@ export default function ItineraryBuilder() {
   }
 
   // ──── Loading State ────
-  if (isGenerating) {
+  if (isGenerating || (currentStep === 3 && !hasGenerated)) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="min-h-screen flex items-center justify-center bg-ivory"
-      >
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center max-w-sm">
           <motion.div
             animate={{ rotate: 360 }}
@@ -761,17 +585,16 @@ export default function ItineraryBuilder() {
             ))}
           </div>
         </div>
-      </motion.div>
+      </div>
     )
   }
 
+  if (days.length === 0 && currentStep === 3) {
+    return null
+  }
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.8 }}
-      className="h-screen bg-ivory flex flex-col"
-    >
+    <div className="h-screen flex flex-col">
       {/* Top Bar */}
       <div className="glass-panel border-b border-sandstone/20 sticky top-0 z-20">
         <div className="px-4 md:px-6 py-3">
@@ -828,10 +651,10 @@ export default function ItineraryBuilder() {
         </div>
       </div>
 
-      {/* Main Content — Split View */}
+      {/* Main Content — Left panel only, map is the persistent background */}
       <div className="flex-1 flex overflow-hidden flex-col md:flex-row">
         {/* Left Panel — Itinerary */}
-        <div className="md:w-[38%] w-full border-r border-sandstone/15 flex flex-col overflow-hidden md:max-h-none max-h-[50vh]">
+        <div className="md:w-[38%] w-full border-r border-sandstone/15 flex flex-col overflow-hidden md:max-h-none max-h-[50vh] glass-panel">
           {/* Day Tabs */}
           <div className="sticky top-0 z-10 glass-panel border-b border-sandstone/15 px-3 py-2.5">
             <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
@@ -839,11 +662,10 @@ export default function ItineraryBuilder() {
                 <button
                   key={dayPlan.day}
                   onClick={() => setActiveDay(dayPlan.day)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-300 relative ${
-                    activeDay === dayPlan.day
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-300 relative ${activeDay === dayPlan.day
                       ? 'bg-charcoal text-warm-white shadow-sm'
                       : 'text-charcoal-light/60 hover:bg-beige/60'
-                  }`}
+                    }`}
                 >
                   Day {dayPlan.day}
                   {dayPlan.nodes.length > 0 && (
@@ -926,7 +748,6 @@ export default function ItineraryBuilder() {
 
           {/* Bottom Summary */}
           <div className="sticky bottom-0 glass-panel border-t border-sandstone/15 p-3">
-            {/* Optimizing indicator */}
             <AnimatePresence>
               {isOptimizing && (
                 <motion.div
@@ -960,7 +781,6 @@ export default function ItineraryBuilder() {
               </div>
             </div>
 
-            {/* Budget usage bar */}
             <div className="h-1.5 bg-sandstone/20 rounded-full overflow-hidden mb-1.5">
               <motion.div
                 className="h-full rounded-full"
@@ -982,7 +802,6 @@ export default function ItineraryBuilder() {
               )}
             </p>
 
-            {/* Budget Breakdown */}
             <AnimatePresence>
               {showBreakdown && (
                 <motion.div
@@ -1000,7 +819,6 @@ export default function ItineraryBuilder() {
               )}
             </AnimatePresence>
 
-            {/* Action Buttons */}
             <div className="flex gap-2">
               <button
                 onClick={handleExport}
@@ -1023,24 +841,8 @@ export default function ItineraryBuilder() {
           </div>
         </div>
 
-        {/* Right Panel — 3D City Map */}
+        {/* Right Panel — Map overlays only (the map itself is the persistent background) */}
         <div className="md:w-[62%] w-full relative flex-1" style={{ minHeight: '300px' }}>
-          <div
-            ref={mapContainerRef}
-            className="absolute inset-0"
-            style={{ backgroundColor: '#F6F3EE', width: '100%', height: '100%' }}
-          />
-
-          {/* Map loading indicator */}
-          {!mapInitialized && (
-            <div className="absolute inset-0 flex items-center justify-center z-10 bg-ivory/50">
-              <div className="text-center">
-                <div className="w-8 h-8 rounded-full border-2 border-sandstone/30 border-t-gold animate-spin mx-auto mb-3" />
-                <p className="text-xs text-charcoal-light/50">Loading {selectedDestination?.name} city map...</p>
-              </div>
-            </div>
-          )}
-
           {/* Day & theme overlay */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -1059,17 +861,16 @@ export default function ItineraryBuilder() {
               <button
                 key={d.day}
                 onClick={() => setActiveDay(d.day)}
-                className={`w-8 h-8 rounded-full text-xs font-bold transition-all duration-300 ${
-                  d.day === activeDay
+                className={`w-8 h-8 rounded-full text-xs font-bold transition-all duration-300 ${d.day === activeDay
                     ? 'text-warm-white shadow-lg'
                     : 'glass-panel text-charcoal-light/60 hover:text-charcoal'
-                }`}
+                  }`}
                 style={
                   d.day === activeDay
                     ? {
-                        background: 'linear-gradient(135deg, #C4734F, #C9A96E)',
-                        boxShadow: '0 4px 16px rgba(196, 115, 79, 0.4)',
-                      }
+                      background: 'linear-gradient(135deg, #C4734F, #C9A96E)',
+                      boxShadow: '0 4px 16px rgba(196, 115, 79, 0.4)',
+                    }
                     : {}
                 }
               >
@@ -1079,6 +880,6 @@ export default function ItineraryBuilder() {
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 }
