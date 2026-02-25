@@ -1,0 +1,174 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --ivory: #F6F3EE;
+  --sandstone: #D8C7B3;
+  --warm-beige: #E8DFD2;
+  --terracotta: #C4734F;
+  --soft-gold: #C9A96E;
+  --deep-charcoal: #2C2C2C;
+  --charcoal-light: #4A4A4A;
+  --warm-white: #FDFCFA;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--ivory);
+  color: var(--deep-charcoal);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* ──── Glass Panel ──── */
+.glass-panel {
+  background: rgba(253, 252, 250, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(216, 199, 179, 0.3);
+  box-shadow: 0 8px 32px rgba(44, 44, 44, 0.08);
+}
+
+/* ──── Mapbox Overrides ──── */
+.mapboxgl-canvas { outline: none; }
+.mapboxgl-popup-content {
+  padding: 0 !important;
+  border-radius: 16px;
+  box-shadow: 0 12px 48px rgba(44, 44, 44, 0.12);
+}
+.mapboxgl-ctrl-group {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 16px rgba(44, 44, 44, 0.08) !important;
+  border: 1px solid rgba(216, 199, 179, 0.3) !important;
+}
+.mapboxgl-ctrl-attrib { opacity: 0.5; font-size: 9px !important; }
+
+/* ──── Custom Scrollbar ──── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--sandstone); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--terracotta); }
+
+/* Hide scrollbar for day tabs */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ──── Animations ──── */
+@keyframes gold-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 169, 110, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(201, 169, 110, 0); }
+}
+.gold-pulse { animation: gold-pulse 2.5s ease-in-out infinite; }
+
+/* Pin pulse animation for map markers — uses box-shadow only, NO transform
+   to avoid fighting with Mapbox's internal marker positioning */
+.velosta-pin-pulse {
+  animation: pin-pulse 3s ease-in-out infinite;
+}
+@keyframes pin-pulse {
+  0%, 100% {
+    filter: brightness(1);
+    opacity: 1;
+  }
+  50% {
+    filter: brightness(1.15);
+    opacity: 0.92;
+  }
+}
+
+/* Cloud drift animations for cinematic intro — ONLY translate, never opacity.
+   Opacity is controlled by inline React styles to avoid CSS animation override conflicts. */
+@keyframes cloud-drift-1 {
+  0%   { transform: translate3d(0, 0, 0); }
+  25%  { transform: translate3d(20px, -10px, 0); }
+  50%  { transform: translate3d(35px, -5px, 0); }
+  75%  { transform: translate3d(15px, -12px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes cloud-drift-2 {
+  0%   { transform: translate3d(0, 0, 0); }
+  30%  { transform: translate3d(-25px, 8px, 0); }
+  60%  { transform: translate3d(-10px, 15px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes cloud-drift-3 {
+  0%   { transform: translate3d(0, 0, 0); }
+  50%  { transform: translate3d(18px, 12px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+.cloud-drift-slow { animation: cloud-drift-1 22s ease-in-out infinite; }
+.cloud-drift-mid  { animation: cloud-drift-2 16s ease-in-out infinite; }
+.cloud-drift-fast { animation: cloud-drift-3 11s ease-in-out infinite; }
+
+/* ──── Budget Slider ──── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(to right, var(--sandstone), var(--soft-gold));
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--soft-gold);
+  cursor: pointer;
+  border: 3px solid var(--warm-white);
+  box-shadow: 0 2px 8px rgba(201, 169, 110, 0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px rgba(201, 169, 110, 0.5);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--soft-gold);
+  cursor: pointer;
+  border: 3px solid var(--warm-white);
+  box-shadow: 0 2px 8px rgba(201, 169, 110, 0.4);
+}
+
+/* ──── Line Clamp ──── */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ──── Mobile Responsive Tweaks ──── */
+@media (max-width: 768px) {
+  .glass-panel {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
