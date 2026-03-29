@@ -1,14 +1,18 @@
 import type { Destination, DayPlan, Activity, POI, UserPreferences } from './types'
+import { getPreBuiltItinerary } from './itineraries-db'
 
 /**
  * Generate a realistic itinerary from real POI data for a destination.
- * This uses the destination's POI coordinates and details to create
- * a day-by-day plan that makes geographic and temporal sense.
+ * First checks the pre-built database, then falls back to algorithmic generation.
  */
 export function generateItinerary(
   destination: Destination,
   preferences: UserPreferences
 ): DayPlan[] {
+  // Check pre-built database first
+  const preBuilt = getPreBuiltItinerary(destination.id, preferences.days)
+  if (preBuilt) return preBuilt
+
   const { days: numDays, budget, tripType } = preferences
   const pois = [...destination.pois]
   const dailyBudget = budget / numDays

@@ -50,6 +50,7 @@ export interface POI {
   rating: number
   tips: string[]
   bestTime?: string
+  imageUrl?: string
 }
 
 export interface Activity {
@@ -65,6 +66,7 @@ export interface Activity {
   basedOnExperiences: number
   tips?: string[]
   location: Coordinates
+  imageUrl?: string
 }
 
 export interface DayPlan {

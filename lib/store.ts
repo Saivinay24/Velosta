@@ -16,6 +16,8 @@ interface TravelState {
   setMapRef: (map: mapboxgl.Map | null) => void
   mapLoaded: boolean
   setMapLoaded: (loaded: boolean) => void
+  mapStyle: 'light' | 'satellite'
+  toggleMapStyle: () => void
 
   // Step 1: User preferences
   budgetValue: number
@@ -47,6 +49,8 @@ interface TravelState {
   goToPreviousStep: () => void
   isTransitioning: boolean
   setIsTransitioning: (transitioning: boolean) => void
+  cloudTransitionActive: boolean
+  setCloudTransitionActive: (active: boolean) => void
   reset: () => void
 
   // Helpers
@@ -59,6 +63,19 @@ export const useTravelStore = create<TravelState>((set, get) => ({
   setMapRef: (map) => set({ mapRef: map }),
   mapLoaded: false,
   setMapLoaded: (loaded) => set({ mapLoaded: loaded }),
+  mapStyle: 'light' as 'light' | 'satellite',
+  toggleMapStyle: () => {
+    const state = get()
+    const newStyle = state.mapStyle === 'light' ? 'satellite' : 'light'
+    set({ mapStyle: newStyle })
+    if (state.mapRef) {
+      state.mapRef.setStyle(
+        newStyle === 'satellite'
+          ? 'mapbox://styles/mapbox/satellite-streets-v12'
+          : 'mapbox://styles/mapbox/light-v11'
+      )
+    }
+  },
 
   budgetValue: 50000,
   setBudgetValue: (value) => set({ budgetValue: value }),
@@ -94,27 +111,32 @@ export const useTravelStore = create<TravelState>((set, get) => ({
   setCurrentStep: (step) => set({ currentStep: step }),
   goToNextStep: () => {
     const state = get()
-    set({ isTransitioning: true })
+    // Phase 1: Clouds roll in
+    set({ isTransitioning: true, cloudTransitionActive: true })
+    // Phase 2: Step changes behind clouds
     setTimeout(() => {
-      set({
-        currentStep: Math.min(3, state.currentStep + 1) as 1 | 2 | 3,
-        isTransitioning: false,
-      })
-    }, 800)
+      set({ currentStep: Math.min(3, state.currentStep + 1) as 1 | 2 | 3 })
+    }, 700)
+    // Phase 3: Clouds clear, reveal new view
+    setTimeout(() => {
+      set({ cloudTransitionActive: false, isTransitioning: false })
+    }, 1400)
   },
   goToPreviousStep: () => {
     const state = get()
-    set({ isTransitioning: true })
+    set({ isTransitioning: true, cloudTransitionActive: true })
     setTimeout(() => {
-      set({
-        currentStep: Math.max(1, state.currentStep - 1) as 1 | 2 | 3,
-        isTransitioning: false,
-      })
+      set({ currentStep: Math.max(1, state.currentStep - 1) as 1 | 2 | 3 })
     }, 600)
+    setTimeout(() => {
+      set({ cloudTransitionActive: false, isTransitioning: false })
+    }, 1200)
   },
 
   isTransitioning: false,
   setIsTransitioning: (transitioning) => set({ isTransitioning: transitioning }),
+  cloudTransitionActive: false,
+  setCloudTransitionActive: (active) => set({ cloudTransitionActive: active }),
 
   reset: () =>
     set({
@@ -128,6 +150,7 @@ export const useTravelStore = create<TravelState>((set, get) => ({
       activeDay: 1,
       currentStep: 1,
       isTransitioning: false,
+      cloudTransitionActive: false,
       mapLoaded: false,
     }),
 

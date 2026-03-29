@@ -89,6 +89,7 @@ export default function CloudOverlay() {
                     opacity: cloudOpacity,
                     transform: cloudsGone ? 'translateY(40px) scale(1.03)' : 'translateY(0) scale(1)',
                     transition: 'opacity 3s cubic-bezier(0.4, 0, 0.2, 1), transform 4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    willChange: 'opacity, transform',
                 }}
             >
                 {/* Solid warm-white base */}
@@ -159,6 +160,7 @@ export default function CloudOverlay() {
                     zIndex: 3, pointerEvents: 'none',
                     opacity: warmGlowVisible && currentStep === 1 ? 1 : 0,
                     transition: 'opacity 1.5s ease 0.5s',
+                    willChange: 'opacity',
                 }}
             >
                 <div style={{
