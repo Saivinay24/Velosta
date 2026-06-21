@@ -1,4 +1,5 @@
 import type { Destination, BudgetTier } from './types'
+import { bangaloreDestinations } from './bangalore-destinations'
 
 export const budgetTiers: BudgetTier[] = [
 	{
@@ -55,7 +56,7 @@ export const destinations: Destination[] = [
 			category: 'relaxation',
 			bestFor: ['couple', 'friends', 'solo'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220',
+		imageUrl: 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=800&q=80',
 		popularityScore: 88,
 		pois: [
 			{
@@ -68,6 +69,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 90,
 				rating: 4.5,
 				tips: ['Best at sunrise', 'Free to walk'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1590050751373-5035a8005e74?w=400&q=80',
 			},
 			{
 				id: 'pon-2',
@@ -79,6 +82,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 180,
 				rating: 4.7,
 				tips: ['Book Matrimandir pass in advance', 'Carry water'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1621232050249-d29e4e15c797?w=400&q=80',
 			},
 			{
 				id: 'pon-3',
@@ -90,6 +95,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 60,
 				rating: 4.3,
 				tips: ['Try the croissants', 'Great for brunch'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400&q=80',
 			},
 			{
 				id: 'pon-4',
@@ -101,6 +108,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 180,
 				rating: 4.6,
 				tips: ['Boat from Chunnambar', 'Carry sunscreen'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80',
 			},
 			{
 				id: 'pon-5',
@@ -112,6 +121,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 60,
 				rating: 4.4,
 				tips: ['Maintain silence', 'Open 8am-12pm, 2pm-6pm'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1600093463592-8e36ca2f2945?w=400&q=80',
 			},
 		],
 	},
@@ -129,7 +140,7 @@ export const destinations: Destination[] = [
 			category: 'culture',
 			bestFor: ['solo', 'friends', 'couple'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1599661046289-e31897846e41',
+		imageUrl: 'https://images.unsplash.com/photo-1590050752117-238cb0fb12b1?w=800&q=80',
 		popularityScore: 82,
 		pois: [
 			{
@@ -142,6 +153,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 90,
 				rating: 4.8,
 				tips: ['Visit at dawn for the best light', 'Monkeys are active here'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1600100397608-e1f2d0944940?w=400&q=80',
 			},
 			{
 				id: 'ham-2',
@@ -153,6 +166,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 120,
 				rating: 4.9,
 				tips: ['Hire a guide', 'Wear comfortable shoes'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1590050752117-238cb0fb12b1?w=400&q=80',
 			},
 			{
 				id: 'ham-3',
@@ -164,6 +179,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 90,
 				rating: 4.7,
 				tips: ['Start climb 30min before sunrise', 'Carry a flashlight'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80',
 			},
 			{
 				id: 'ham-4',
@@ -175,6 +192,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 60,
 				rating: 4.2,
 				tips: ['Try the thali', 'Go for sunset dinner'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&q=80',
 			},
 			{
 				id: 'ham-5',
@@ -186,6 +205,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 30,
 				rating: 4.5,
 				tips: ['Negotiate the price', 'Fun with friends'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=80',
 			},
 		],
 	},
@@ -204,7 +225,7 @@ export const destinations: Destination[] = [
 			category: 'nature',
 			bestFor: ['friends', 'solo', 'couple'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1587474260584-136574528ed5',
+		imageUrl: 'https://images.unsplash.com/photo-1587474260584-136574528ed5?w=800&q=80',
 		popularityScore: 87,
 		pois: [
 			{
@@ -221,6 +242,8 @@ export const destinations: Destination[] = [
 					'Start early morning',
 					'Carry enough water',
 				],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1587474260584-136574528ed5?w=400&q=80',
 			},
 			{
 				id: 'meg-2',
@@ -232,6 +255,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 120,
 				rating: 4.8,
 				tips: ['Best Nov-Mar for clarity', 'Boating costs ₹500'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1432405972618-c6b0cfba0866?w=400&q=80',
 			},
 			{
 				id: 'meg-3',
@@ -243,6 +268,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 60,
 				rating: 4.7,
 				tips: ['Best during monsoon', 'Misty and windy at the top'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1474291103559-f48a79787b6b?w=400&q=80',
 			},
 			{
 				id: 'meg-4',
@@ -254,6 +281,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 90,
 				rating: 4.5,
 				tips: ['Try the local lunch', 'Explore the bamboo sky walk'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&q=80',
 			},
 			{
 				id: 'meg-5',
@@ -265,6 +294,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 120,
 				rating: 4.3,
 				tips: ['Allow 2 hours', '7 floors of exhibits'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80',
 			},
 		],
 	},
@@ -282,7 +313,7 @@ export const destinations: Destination[] = [
 			category: 'relaxation',
 			bestFor: ['friends', 'couple', 'solo'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2',
+		imageUrl: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=800&q=80',
 		popularityScore: 95,
 		pois: [
 			{
@@ -298,6 +329,8 @@ export const destinations: Destination[] = [
 					'Photography not allowed inside',
 					'Visit Old Goa complex together',
 				],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=400&q=80',
 			},
 			{
 				id: 'goa-2',
@@ -309,6 +342,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 120,
 				rating: 4.3,
 				tips: ['Wednesday only', 'Bargain aggressively'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1585128792020-803d29415281?w=400&q=80',
 			},
 			{
 				id: 'goa-3',
@@ -320,6 +355,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 180,
 				rating: 4.7,
 				tips: ['South Goa, calmer vibes', 'Kayaking available'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=80',
 			},
 			{
 				id: 'goa-4',
@@ -331,6 +368,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 90,
 				rating: 4.5,
 				tips: ['Book sunset slot', 'Try the mezze platter'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?w=400&q=80',
 			},
 			{
 				id: 'goa-5',
@@ -346,6 +385,8 @@ export const destinations: Destination[] = [
 					'Best Oct-Mar',
 					'Carry change of clothes',
 				],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=400&q=80',
 			},
 		],
 	},
@@ -363,13 +404,15 @@ export const destinations: Destination[] = [
 			category: 'nature',
 			bestFor: ['couple', 'family', 'friends'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4',
+		imageUrl: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=800&q=80',
 		popularityScore: 84,
 		pois: [
 			{
 				id: 'cor-1',
 				name: 'Abbey Falls',
-				location: { lat: 12.4568, lng: 75.7183 },
+				location: { lat: 12.4568, lng: 75.7183 
+				imageUrl: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=400&q=80',
+			},
 				type: 'sight',
 				description: 'Beautiful waterfall surrounded by coffee and spice plantations',
 				estimatedCost: 30,
@@ -380,7 +423,9 @@ export const destinations: Destination[] = [
 			{
 				id: 'cor-2',
 				name: 'Talakaveri',
-				location: { lat: 12.321, lng: 75.492 },
+				location: { lat: 12.321, lng: 75.492 
+				imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80',
+			},
 				type: 'sight',
 				description: 'Source of the River Kaveri with temple',
 				estimatedCost: 0,
@@ -391,7 +436,9 @@ export const destinations: Destination[] = [
 			{
 				id: 'cor-3',
 				name: 'Coffee Plantation Walk',
-				location: { lat: 12.42, lng: 75.74 },
+				location: { lat: 12.42, lng: 75.74 
+				imageUrl: 'https://images.unsplash.com/photo-1610312278520-bcc893a3ff1d?w=400&q=80',
+			},
 				type: 'activity',
 				description: 'Guided tour through aromatic coffee estates',
 				estimatedCost: 300,
@@ -402,7 +449,9 @@ export const destinations: Destination[] = [
 			{
 				id: 'cor-4',
 				name: 'Raja Seat',
-				location: { lat: 12.421, lng: 75.7342 },
+				location: { lat: 12.421, lng: 75.7342 
+				imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400&q=80',
+			},
 				type: 'sight',
 				description: 'Panoramic viewpoint where kings once sat',
 				estimatedCost: 10,
@@ -413,7 +462,9 @@ export const destinations: Destination[] = [
 			{
 				id: 'cor-5',
 				name: 'Nagarhole National Park',
-				location: { lat: 12.0575, lng: 76.15 },
+				location: { lat: 12.0575, lng: 76.15 
+				imageUrl: 'https://images.unsplash.com/photo-1535941339077-2dd1c7963098?w=400&q=80',
+			},
 				type: 'activity',
 				description: 'Wildlife safari with elephants and tigers',
 				estimatedCost: 500,
@@ -441,7 +492,7 @@ export const destinations: Destination[] = [
 			category: 'nature',
 			bestFor: ['couple', 'family', 'friends'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1597074866923-dc0589150458',
+		imageUrl: 'https://images.unsplash.com/photo-1597074866923-dc0589150458?w=800&q=80',
 		popularityScore: 96,
 		pois: [
 			{
@@ -454,6 +505,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 720,
 				rating: 4.8,
 				tips: ['Negotiate price beforehand', 'Shikara ride included'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1597074866923-dc0589150458?w=400&q=80',
 			},
 			{
 				id: 'kas-2',
@@ -465,6 +518,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 90,
 				rating: 4.6,
 				tips: ['Combine with Shalimar Bagh', 'Best in spring'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1566837945700-30057527ade0?w=400&q=80',
 			},
 			{
 				id: 'kas-3',
@@ -476,6 +531,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 240,
 				rating: 4.9,
 				tips: ['Phase 2 for snow point', 'Dress warm even in summer'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1585543805890-6051f7829f98?w=400&q=80',
 			},
 			{
 				id: 'kas-4',
@@ -487,6 +544,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 360,
 				rating: 4.7,
 				tips: ['Horse ride to Baisaran', 'Photography paradise'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1567337710282-00832b415979?w=400&q=80',
 			},
 			{
 				id: 'kas-5',
@@ -498,6 +557,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 60,
 				rating: 4.5,
 				tips: ['Security check at base', 'Best at sunrise'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80',
 			},
 		],
 	},
@@ -515,7 +576,7 @@ export const destinations: Destination[] = [
 			category: 'culture',
 			bestFor: ['couple', 'family', 'friends'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1599661046289-e31897846e41',
+		imageUrl: 'https://images.unsplash.com/photo-1626015365107-73b979d23463?w=800&q=80',
 		popularityScore: 93,
 		pois: [
 			{
@@ -528,6 +589,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 180,
 				rating: 4.8,
 				tips: ['Light & Sound show at night', 'Skip the elephant ride'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1609137144813-7d9921338f24?w=400&q=80',
 			},
 			{
 				id: 'raj-2',
@@ -539,6 +602,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 120,
 				rating: 4.7,
 				tips: ['Boat ride to Lake Palace hotel', 'Crystal gallery worth visiting'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=400&q=80',
 			},
 			{
 				id: 'raj-3',
@@ -550,6 +615,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 720,
 				rating: 4.6,
 				tips: ['Book non-touristy camps', 'Sunset on dunes is magical'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1599661046289-e31897846e41?w=400&q=80',
 			},
 			{
 				id: 'raj-4',
@@ -561,6 +628,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 60,
 				rating: 4.5,
 				tips: ['Best photos from across the street', 'Early morning for no crowds'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400&q=80',
 			},
 			{
 				id: 'raj-5',
@@ -572,6 +641,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 90,
 				rating: 4.4,
 				tips: ['Must try Laal Maas', 'Dal Baati Churma is signature'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1477587458883-47145ed94245?w=400&q=80',
 			},
 		],
 	},
@@ -589,7 +660,7 @@ export const destinations: Destination[] = [
 			category: 'relaxation',
 			bestFor: ['couple', 'family', 'solo'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1602216056096-3b40cc0c9944',
+		imageUrl: 'https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?w=800&q=80',
 		popularityScore: 91,
 		pois: [
 			{
@@ -605,6 +676,8 @@ export const destinations: Destination[] = [
 					'Avoid peak season for better rates',
 					'AC houseboats recommended',
 				],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?w=400&q=80',
 			},
 			{
 				id: 'ker-2',
@@ -619,6 +692,8 @@ export const destinations: Destination[] = [
 					'Visit Tata Tea Museum',
 					'Best during monsoon for lush green',
 				],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1584727638096-042c45049ebe?w=400&q=80',
 			},
 			{
 				id: 'ker-3',
@@ -633,6 +708,8 @@ export const destinations: Destination[] = [
 					'Morning boat better for sightings',
 					'Carry binoculars',
 				],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=80',
 			},
 			{
 				id: 'ker-4',
@@ -644,6 +721,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 60,
 				rating: 4.3,
 				tips: ['Try karimeen fry', 'Authentic local experience'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&q=80',
 			},
 			{
 				id: 'ker-5',
@@ -655,6 +734,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 120,
 				rating: 4.6,
 				tips: ['Great for relaxation', 'Beautiful sunsets'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1606298246186-08989048f609?w=400&q=80',
 			},
 		],
 	},
@@ -672,7 +753,7 @@ export const destinations: Destination[] = [
 			category: 'nature',
 			bestFor: ['friends', 'solo', 'couple'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23',
+		imageUrl: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?w=800&q=80',
 		popularityScore: 86,
 		pois: [
 			{
@@ -685,6 +766,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 90,
 				rating: 4.6,
 				tips: ['Carry warm clothes', 'Yak rides available'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&q=80',
 			},
 			{
 				id: 'sik-2',
@@ -696,6 +779,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 90,
 				rating: 4.5,
 				tips: ['ID required for entry', 'Photography restricted inside'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80',
 			},
 			{
 				id: 'sik-3',
@@ -707,6 +792,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 120,
 				rating: 4.4,
 				tips: ['No vehicles allowed', 'Great street food'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1500259571355-332da5cb07aa?w=400&q=80',
 			},
 			{
 				id: 'sik-4',
@@ -718,6 +805,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 180,
 				rating: 4.7,
 				tips: ['Indian nationals only', 'Permit required 2 days advance'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=80',
 			},
 			{
 				id: 'sik-5',
@@ -729,6 +818,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 360,
 				rating: 4.9,
 				tips: ['Altitude sickness possible', 'Start very early morning'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80',
 			},
 		],
 	},
@@ -747,7 +838,7 @@ export const destinations: Destination[] = [
 			category: 'adventure',
 			bestFor: ['friends', 'solo', 'couple'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23',
+		imageUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80',
 		popularityScore: 97,
 		pois: [
 			{
@@ -760,6 +851,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 720,
 				rating: 4.9,
 				tips: ['Camp overnight for stars', '3 Idiots filming location'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?w=400&q=80',
 			},
 			{
 				id: 'lad-2',
@@ -771,6 +864,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 60,
 				rating: 4.7,
 				tips: ['Acclimatize in Leh first', 'Hot chai at the top'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1573405473507-3b9d63a39fc2?w=400&q=80',
 			},
 			{
 				id: 'lad-3',
@@ -782,6 +877,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 480,
 				rating: 4.8,
 				tips: ['Ride Bactrian camels at Hunder', 'Cold desert landscapes'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1580289907553-2edea4ea8ea0?w=400&q=80',
 			},
 			{
 				id: 'lad-4',
@@ -793,6 +890,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 90,
 				rating: 4.6,
 				tips: ['Attend 6am morning prayers', 'Stunning sunrise views'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=400&q=80',
 			},
 			{
 				id: 'lad-5',
@@ -804,6 +903,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 30,
 				rating: 3.8,
 				tips: ['Fun photo op', 'Combine with Gurudwara Pathar Sahib'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&q=80',
 			},
 		],
 	},
@@ -821,7 +922,7 @@ export const destinations: Destination[] = [
 			category: 'adventure',
 			bestFor: ['couple', 'friends', 'family'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4',
+		imageUrl: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=800&q=80',
 		popularityScore: 89,
 		pois: [
 			{
@@ -834,6 +935,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 180,
 				rating: 4.9,
 				tips: ['Arrive before sunset', 'Swim in designated areas'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=400&q=80',
 			},
 			{
 				id: 'and-2',
@@ -848,6 +951,8 @@ export const destinations: Destination[] = [
 					'Evening light & sound show is a must',
 					'Emotional experience',
 				],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=80',
 			},
 			{
 				id: 'and-3',
@@ -859,6 +964,8 @@ export const destinations: Destination[] = [
 				estimatedDuration: 240,
 				rating: 4.8,
 				tips: ['No swimming needed for beginners', 'Book PADI certified'],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=400&q=80',
 			},
 			{
 				id: 'and-4',
@@ -873,6 +980,8 @@ export const destinations: Destination[] = [
 					'Speedboat from Havelock',
 					'Waterproof phone case essential',
 				],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=80',
 			},
 			{
 				id: 'and-5',
@@ -887,6 +996,8 @@ export const destinations: Destination[] = [
 					'Ferry from Water Sports Complex',
 					'Deer and peacocks roam free',
 				],
+			
+				imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80',
 			},
 		],
 	},
@@ -904,13 +1015,15 @@ export const destinations: Destination[] = [
 			category: 'adventure',
 			bestFor: ['friends', 'solo'],
 		},
-		imageUrl: 'https://images.unsplash.com/photo-1609137144813-7d9921338f24',
+		imageUrl: 'https://images.unsplash.com/photo-1609137144813-7d9921338f24?w=800&q=80',
 		popularityScore: 83,
 		pois: [
 			{
 				id: 'spi-1',
 				name: 'Key Monastery',
-				location: { lat: 32.227, lng: 78.0132 },
+				location: { lat: 32.227, lng: 78.0132 
+				imageUrl: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?w=400&q=80',
+			},
 				type: 'sight',
 				description: 'Iconic 1000-year-old Buddhist monastery',
 				estimatedCost: 0,
@@ -921,7 +1034,9 @@ export const destinations: Destination[] = [
 			{
 				id: 'spi-2',
 				name: 'Chandratal Lake',
-				location: { lat: 32.483, lng: 77.615 },
+				location: { lat: 32.483, lng: 77.615 
+				imageUrl: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80',
+			},
 				type: 'sight',
 				description: 'Moon Lake at 14,100 ft with color-changing waters',
 				estimatedCost: 0,
@@ -932,7 +1047,9 @@ export const destinations: Destination[] = [
 			{
 				id: 'spi-3',
 				name: 'Langza Fossil Village',
-				location: { lat: 32.276, lng: 78.035 },
+				location: { lat: 32.276, lng: 78.035 
+				imageUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80',
+			},
 				type: 'sight',
 				description: 'Village at 14,500 ft famous for marine fossils',
 				estimatedCost: 0,
@@ -943,7 +1060,9 @@ export const destinations: Destination[] = [
 			{
 				id: 'spi-4',
 				name: 'Kunzum Pass',
-				location: { lat: 32.4067, lng: 77.6033 },
+				location: { lat: 32.4067, lng: 77.6033 
+				imageUrl: 'https://images.unsplash.com/photo-1573405473507-3b9d63a39fc2?w=400&q=80',
+			},
 				type: 'sight',
 				description: 'Gateway to Spiti at 15,060 ft',
 				estimatedCost: 0,
@@ -954,7 +1073,9 @@ export const destinations: Destination[] = [
 			{
 				id: 'spi-5',
 				name: 'Pin Valley',
-				location: { lat: 32, lng: 78.25 },
+				location: { lat: 32, lng: 78.25 
+				imageUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&q=80',
+			},
 				type: 'activity',
 				description: 'Cold desert national park with snow leopard habitat',
 				estimatedCost: 200,
@@ -965,6 +1086,13 @@ export const destinations: Destination[] = [
 		],
 	},
 ]
+
+// Merge Bangalore college destinations
+bangaloreDestinations.forEach(bd => {
+	if (!destinations.find(d => d.id === bd.id)) {
+		destinations.push(bd)
+	}
+})
 
 // Helper: get day-fit color based on available days vs required days
 export function getDayFitColor(

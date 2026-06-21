@@ -5,20 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import mapboxgl from 'mapbox-gl'
 import { useTravelStore } from '@/lib/store'
 import { destinations, getDayFitColor, filterByBudget, filterByTripType } from '@/lib/data'
-import type { Destination, TripCategory } from '@/lib/types'
+import type { Destination, TripCategory, TripType } from '@/lib/types'
 import {
-  ArrowLeft,
-  Calendar,
-  X,
-  MapPin,
-  Filter,
-  Mountain,
-  Landmark,
-  Compass,
-  Palmtree,
-  Clock,
-  IndianRupee,
-  Star,
+  ArrowLeft, Calendar, X, MapPin, Filter, Mountain, Landmark, Compass, Palmtree,
+  Clock, IndianRupee, Star, Search, Users, User, Heart, ChevronDown, ChevronUp, Wallet,
+  Globe, Map,
 } from 'lucide-react'
 
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -28,355 +19,451 @@ const categoryIcons: Record<string, React.ReactNode> = {
   relaxation: <Palmtree className="w-3.5 h-3.5" />,
 }
 
+const tripTypeIcons: Record<string, React.ReactNode> = {
+  solo: <User className="w-3.5 h-3.5" />,
+  couple: <Heart className="w-3.5 h-3.5" />,
+  friends: <Users className="w-3.5 h-3.5" />,
+  family: <Users className="w-3.5 h-3.5" />,
+}
+
+const spring = { type: 'spring' as const, stiffness: 300, damping: 30 }
+
+function createPinSVG(color: string, selected = false): string {
+  const size = selected ? 40 : 32
+  const scale = selected ? 1.25 : 1
+  return `
+    <svg width="${size}" height="${Math.round(size * 1.3)}" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <filter id="s"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#00000030"/></filter>
+      <g filter="url(#s)" transform="scale(${scale})">
+        <path d="M16 0C7.163 0 0 7.163 0 16c0 12 16 26 16 26s16-14 16-26C32 7.163 24.837 0 16 0z" fill="${color}"/>
+        <circle cx="16" cy="15" r="6" fill="white" fill-opacity="0.9"/>
+      </g>
+    </svg>
+  `
+}
+
 export default function MapView() {
   const [hoveredDestination, setHoveredDestination] = useState<Destination | null>(null)
+  const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null)
   const [selectedCard, setSelectedCard] = useState<Destination | null>(null)
-  const [showFilters, setShowFilters] = useState(false)
+  const [imgErrors, setImgErrors] = useState<Set<string>>(new Set())
+  const [showList, setShowList] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const markersRef = useRef<mapboxgl.Marker[]>([])
   const hoveredRef = useRef<Destination | null>(null)
-  const sourceAddedRef = useRef(false)
-  const layersAddedRef = useRef(false)
 
   const {
-    budgetValue,
-    tripDays,
-    tripType,
-    selectedCategories,
-    toggleCategory,
-    goToPreviousStep,
-    setSelectedDestination,
-    goToNextStep,
-    mapRef,
-    mapLoaded,
-    currentStep,
+    budgetValue, setBudgetValue,
+    tripDays, setTripDays,
+    tripType, setTripType,
+    selectedCategories, toggleCategory,
+    goToPreviousStep, setSelectedDestination, goToNextStep,
+    mapRef, mapLoaded, currentStep,
+    mapStyle, toggleMapStyle,
   } = useTravelStore()
 
-  // Filter destinations
+  // ── Keyboard ──
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (currentStep !== 2) return
+      if (e.key === 'Escape') {
+        if (selectedCard) { setSelectedCard(null); resetMapView() }
+        else goToPreviousStep()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentStep, selectedCard])
+
+  // ── Filter destinations ──
   const filteredDestinations = useMemo(() => {
     let dests = filterByBudget(budgetValue)
     dests = filterByTripType(dests, tripType)
     if (selectedCategories.length > 0) {
-      dests = dests.filter((d) => selectedCategories.includes(d.tripDetails.category as TripCategory))
+      dests = dests.filter(d => selectedCategories.includes(d.tripDetails.category as TripCategory))
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      dests = dests.filter(d => d.name.toLowerCase().includes(q) || d.state.toLowerCase().includes(q))
     }
     return dests
-  }, [budgetValue, tripType, selectedCategories])
+  }, [budgetValue, tripType, selectedCategories, searchQuery])
 
-  // ──── Build pins when step 2 is active ────
+  // ──── Build REAL pin markers ────
   useEffect(() => {
     if (!mapRef || !mapLoaded || currentStep !== 2) return
 
-    const m = mapRef
-
-    // Wait for the camera transition to settle
     const addPinsTimer = setTimeout(() => {
-      // Cleanup old HTML hit-target markers
-      markersRef.current.forEach((mk) => mk.remove())
+      // Clean old markers
+      markersRef.current.forEach(mk => mk.remove())
       markersRef.current = []
 
-      // Remove old layers/sources if they exist
-      try { if (m.getLayer('dest-pins-glow')) m.removeLayer('dest-pins-glow') } catch { }
-      try { if (m.getLayer('dest-pins')) m.removeLayer('dest-pins') } catch { }
-      try { if (m.getLayer('dest-pins-border')) m.removeLayer('dest-pins-border') } catch { }
-      try { if (m.getSource('dest-pins-source')) m.removeSource('dest-pins-source') } catch { }
-      sourceAddedRef.current = false
-
-      // Build GeoJSON features
-      const features = filteredDestinations.map((dest) => {
+      filteredDestinations.forEach(dest => {
         const dayFit = getDayFitColor(dest, tripDays)
-        const pinSize = dest.popularityScore > 90 ? 10 : dest.popularityScore > 85 ? 8 : 7
-        return {
-          type: 'Feature' as const,
-          properties: { id: dest.id, color: dayFit.color, size: pinSize },
-          geometry: { type: 'Point' as const, coordinates: [dest.location.lng, dest.location.lat] },
-        }
-      })
+        // Outer el: Mapbox controls this element's transform for positioning.
+        // Inner pinEl: we control this for hover animations (scale, translateY).
+        const el = document.createElement('div')
+        el.style.cssText = 'cursor:pointer;'
+        const pinEl = document.createElement('div')
+        pinEl.style.cssText = 'transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1);'
+        pinEl.innerHTML = createPinSVG(dayFit.color)
+        el.appendChild(pinEl)
 
-      m.addSource('dest-pins-source', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features },
-      })
-      sourceAddedRef.current = true
-
-      // Glow layer
-      m.addLayer({
-        id: 'dest-pins-glow', type: 'circle', source: 'dest-pins-source',
-        paint: {
-          'circle-radius': ['get', 'size'], 'circle-color': ['get', 'color'],
-          'circle-opacity': 0.25, 'circle-blur': 0.8,
-        },
-      })
-
-      // White border layer
-      m.addLayer({
-        id: 'dest-pins-border', type: 'circle', source: 'dest-pins-source',
-        paint: {
-          'circle-radius': ['+', ['get', 'size'], 2],
-          'circle-color': '#FDFCFA', 'circle-opacity': 1,
-        },
-      })
-
-      // Main pin circle
-      m.addLayer({
-        id: 'dest-pins', type: 'circle', source: 'dest-pins-source',
-        paint: {
-          'circle-radius': ['get', 'size'], 'circle-color': ['get', 'color'],
-          'circle-opacity': 1,
-        },
-      })
-      layersAddedRef.current = true
-
-      // Invisible hit-targets
-      filteredDestinations.forEach((dest) => {
-        const hitTarget = document.createElement('div')
-        hitTarget.style.cssText = `width:32px;height:32px;cursor:pointer;background:transparent;border-radius:50%;`
-
-        hitTarget.addEventListener('mouseenter', () => {
+        el.addEventListener('mouseenter', () => {
           hoveredRef.current = dest
           setHoveredDestination(dest)
+          pinEl.style.transform = 'scale(1.3) translateY(-4px)'
           if (mapRef) {
-            mapRef.setPaintProperty('dest-pins', 'circle-radius', [
-              'case', ['==', ['get', 'id'], dest.id], ['+', ['get', 'size'], 3], ['get', 'size'],
-            ])
-            mapRef.setPaintProperty('dest-pins-glow', 'circle-radius', [
-              'case', ['==', ['get', 'id'], dest.id], ['+', ['get', 'size'], 8], ['get', 'size'],
-            ])
-            mapRef.setPaintProperty('dest-pins-glow', 'circle-opacity', [
-              'case', ['==', ['get', 'id'], dest.id], 0.45, 0.25,
-            ])
+            const pt = mapRef.project([dest.location.lng, dest.location.lat])
+            setHoverPosition({ x: pt.x, y: pt.y })
           }
         })
 
-        hitTarget.addEventListener('mouseleave', () => {
+        el.addEventListener('mouseleave', () => {
+          pinEl.style.transform = 'scale(1)'
           setTimeout(() => {
             if (hoveredRef.current === dest) {
               hoveredRef.current = null
               setHoveredDestination(null)
+              setHoverPosition(null)
             }
           }, 50)
-          if (mapRef) {
-            mapRef.setPaintProperty('dest-pins', 'circle-radius', ['get', 'size'])
-            mapRef.setPaintProperty('dest-pins-glow', 'circle-radius', ['get', 'size'])
-            mapRef.setPaintProperty('dest-pins-glow', 'circle-opacity', 0.25)
-          }
         })
 
-        hitTarget.addEventListener('click', (e) => {
+        el.addEventListener('click', (e) => {
           e.stopPropagation()
           setSelectedCard(dest)
-          if (mapRef) {
-            mapRef.flyTo({
-              center: [dest.location.lng, dest.location.lat],
-              zoom: 9, duration: 2000, curve: 1.5, pitch: 0,
-              easing: (t: number) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t),
-            })
-          }
+          mapRef?.flyTo({
+            center: [dest.location.lng, dest.location.lat],
+            zoom: 9, duration: 2000, curve: 1.5, pitch: 0,
+          })
         })
 
-        const marker = new mapboxgl.Marker({ element: hitTarget, anchor: 'center' })
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([dest.location.lng, dest.location.lat])
-          .addTo(m)
+          .addTo(mapRef)
         markersRef.current.push(marker)
       })
-    }, 500) // Wait for camera flyTo to begin
+    }, 300)
 
     return () => {
       clearTimeout(addPinsTimer)
-    }
-  }, [filteredDestinations, tripDays, mapLoaded, currentStep, mapRef])
-
-  // ──── Cleanup pins when leaving step 2 ────
-  useEffect(() => {
-    if (currentStep !== 2 && mapRef && layersAddedRef.current) {
-      // Remove pin layers and markers so they don't show in step 1 or 3
-      markersRef.current.forEach((mk) => mk.remove())
+      markersRef.current.forEach(mk => mk.remove())
       markersRef.current = []
-      try { if (mapRef.getLayer('dest-pins-glow')) mapRef.removeLayer('dest-pins-glow') } catch { }
-      try { if (mapRef.getLayer('dest-pins')) mapRef.removeLayer('dest-pins') } catch { }
-      try { if (mapRef.getLayer('dest-pins-border')) mapRef.removeLayer('dest-pins-border') } catch { }
-      try { if (mapRef.getSource('dest-pins-source')) mapRef.removeSource('dest-pins-source') } catch { }
-      sourceAddedRef.current = false
-      layersAddedRef.current = false
     }
-  }, [currentStep, mapRef])
+  }, [mapRef, mapLoaded, currentStep, filteredDestinations, tripDays])
 
-  const handleSelectDestination = (dest: Destination) => {
+  // ── Cleanup on step change ──
+  useEffect(() => {
+    if (currentStep !== 2) {
+      markersRef.current.forEach(mk => mk.remove())
+      markersRef.current = []
+    }
+  }, [currentStep])
+
+  // ── Handlers ──
+  const handleSelectDestination = useCallback((dest: Destination) => {
     setSelectedDestination(dest)
-    setTimeout(() => goToNextStep(), 600)
-  }
-
-  const resetMapView = () => {
+    goToNextStep()
     setSelectedCard(null)
-    mapRef?.flyTo({
-      center: [78.9629, 22.5937],
-      zoom: 4.2, pitch: 0, bearing: 0, duration: 1500,
-    })
-  }
+  }, [setSelectedDestination, goToNextStep])
+
+  const resetMapView = useCallback(() => {
+    setSelectedCard(null)
+    mapRef?.flyTo({ center: [78.9629, 22.5937], zoom: 4.2, pitch: 0, bearing: 0, duration: 1500 })
+  }, [mapRef])
+
+  const categories: TripCategory[] = ['nature', 'culture', 'adventure', 'relaxation']
+  const tripTypes: TripType[] = ['solo', 'couple', 'friends', 'family']
+  const dayOptions = [2, 3, 5, 7, 10, 14]
 
   return (
-    <div className="relative h-screen w-full overflow-hidden">
-      {/* Top Bar */}
+    <div className="relative h-screen w-full overflow-hidden" style={{ pointerEvents: 'none' }}>
+
+      {/* ═══ LEFT SIDEBAR — Preferences & Filters ═══ */}
+      <motion.div
+        initial={{ opacity: 0, x: -40 }}
+        animate={{ opacity: currentStep === 2 ? 1 : 0, x: currentStep === 2 ? 0 : -40 }}
+        transition={{ delay: 0.4, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="absolute top-[72px] left-0 bottom-0 w-[280px] glass-panel-heavy z-10 flex flex-col overflow-y-auto scrollbar-hide"
+        style={{ position: 'absolute', pointerEvents: currentStep === 2 ? 'auto' : 'none', borderRight: '1px solid var(--glass-border)' }}
+      >
+        <div className="p-4 space-y-5 flex-1">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-light/40" />
+            <input
+              type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search destinations..."
+              className="w-full pl-9 pr-3 py-2.5 text-sm font-sans bg-beige/40 rounded-xl border border-transparent focus:border-sandstone/50 outline-none placeholder:text-charcoal-light/30"
+            />
+          </div>
+
+          {/* Budget */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Wallet className="w-3.5 h-3.5 text-soft-gold" />
+              <span className="text-xs font-sans font-semibold text-charcoal uppercase tracking-wide">Budget</span>
+            </div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-lg font-serif text-charcoal tabular-nums">₹{budgetValue.toLocaleString('en-IN')}</span>
+            </div>
+            <input type="range" min={5000} max={200000} step={1000} value={budgetValue}
+              onChange={e => setBudgetValue(Number(e.target.value))} className="w-full" />
+            <div className="flex justify-between text-[10px] font-sans text-charcoal-light/40 mt-1">
+              <span>₹5,000</span><span>₹2,00,000</span>
+            </div>
+          </div>
+
+          {/* Duration */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="w-3.5 h-3.5 text-soft-gold" />
+              <span className="text-xs font-sans font-semibold text-charcoal uppercase tracking-wide">Duration</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {dayOptions.map(d => (
+                <motion.button key={d} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                  onClick={() => setTripDays(d)}
+                  className={`py-2 text-xs font-sans font-medium transition-all ${tripDays === d
+                    ? 'bg-charcoal text-warm-white shadow-sm' : 'bg-beige/50 text-charcoal-light/60 hover:bg-beige'}`}
+                  style={{ borderRadius: '10px' }}>
+                  {d}d
+                </motion.button>
+              ))}
+            </div>
+          </div>
+
+          {/* Trip Type */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="w-3.5 h-3.5 text-soft-gold" />
+              <span className="text-xs font-sans font-semibold text-charcoal uppercase tracking-wide">Trip Type</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {tripTypes.map(t => (
+                <motion.button key={t} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                  onClick={() => setTripType(t)}
+                  className={`py-2.5 px-3 text-xs font-sans font-medium capitalize flex items-center gap-1.5 justify-center transition-all ${tripType === t
+                    ? 'bg-charcoal text-warm-white shadow-sm' : 'bg-beige/50 text-charcoal-light/60 hover:bg-beige'}`}
+                  style={{ borderRadius: '10px' }}>
+                  {tripTypeIcons[t]}
+                  {t}
+                </motion.button>
+              ))}
+            </div>
+          </div>
+
+          {/* Categories */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Compass className="w-3.5 h-3.5 text-soft-gold" />
+              <span className="text-xs font-sans font-semibold text-charcoal uppercase tracking-wide">Category</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {categories.map(cat => {
+                const active = selectedCategories.includes(cat)
+                return (
+                  <motion.button key={cat} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                    onClick={() => toggleCategory(cat)}
+                    className={`py-2.5 px-3 text-xs font-sans font-medium capitalize flex items-center gap-1.5 justify-center transition-all ${active
+                      ? 'bg-terracotta text-warm-white shadow-sm' : 'bg-beige/50 text-charcoal-light/60 hover:bg-beige'}`}
+                    style={{ borderRadius: '10px' }}>
+                    {categoryIcons[cat]}
+                    {cat}
+                  </motion.button>
+                )
+              })}
+            </div>
+            {selectedCategories.length > 0 && (
+              <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                onClick={() => { selectedCategories.forEach(c => toggleCategory(c)) }}
+                className="text-[10px] font-sans text-terracotta mt-1.5 hover:underline">
+                Clear filters
+              </motion.button>
+            )}
+          </div>
+
+          {/* Destination Count */}
+          <div className="glass-panel p-3.5" style={{ borderRadius: '14px' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-sans text-charcoal-light/50">Matching destinations</span>
+              <span className="text-lg font-serif text-charcoal tabular-nums">{filteredDestinations.length}</span>
+            </div>
+          </div>
+
+          {/* Day Compatibility Legend */}
+          <div>
+            <h3 className="font-sans font-semibold text-charcoal mb-2 text-xs tracking-wide uppercase">Day Fit</h3>
+            <div className="space-y-1.5">
+              {[
+                { color: '#22c55e', label: 'Comfortable' },
+                { color: '#eab308', label: 'Slightly hectic' },
+                { color: '#f97316', label: 'Too tight' },
+              ].map(item => (
+                <div key={item.label} className="flex items-center gap-2 text-xs font-sans">
+                  <div className="w-3 h-3 rounded-full border-2 border-warm-white" style={{ backgroundColor: item.color }} />
+                  <span style={{ color: 'rgba(74,74,74,0.6)' }}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Map Style Toggle */}
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={toggleMapStyle}
+            className="w-full py-2.5 px-3 text-xs font-sans font-medium flex items-center justify-center gap-2 transition-all bg-beige/50 text-charcoal-light/70 hover:bg-beige"
+            style={{ borderRadius: '10px' }}>
+            {mapStyle === 'light' ? <Globe className="w-3.5 h-3.5" /> : <Map className="w-3.5 h-3.5" />}
+            {mapStyle === 'light' ? 'Satellite View' : 'Default View'}
+          </motion.button>
+        </div>
+
+        {/* Sidebar List Toggle */}
+        <div className="p-4 flex-shrink-0" style={{ borderTop: '1px solid var(--glass-border)' }}>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={() => setShowList(!showList)}
+            className="w-full py-2.5 text-xs font-sans font-semibold flex items-center justify-center gap-2 bg-charcoal text-warm-white transition-all"
+            style={{ borderRadius: '12px' }}>
+            <MapPin className="w-3.5 h-3.5" />
+            {showList ? 'Hide List' : 'View as List'}
+          </motion.button>
+        </div>
+      </motion.div>
+
+      {/* ═══ TOP BAR ═══ */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: currentStep === 2 ? 1 : 0, y: currentStep === 2 ? 0 : -20 }}
-        transition={{ delay: 0.3, duration: 0.6 }}
-        className="absolute top-0 left-0 right-0 glass-panel p-4 z-10"
-        style={{ pointerEvents: currentStep === 2 ? 'auto' : 'none' }}
+        transition={{ delay: 0.3, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="absolute top-0 left-0 right-0 glass-panel-heavy p-4 z-10"
+        style={{ position: 'absolute', pointerEvents: currentStep === 2 ? 'auto' : 'none', borderBottom: '1px solid var(--glass-border)' }}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <button
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
             onClick={goToPreviousStep}
-            className="flex items-center gap-2 text-charcoal hover:text-terracotta transition-colors duration-300"
-          >
+            className="flex items-center gap-2 text-charcoal hover:text-terracotta transition-colors duration-300">
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium text-sm hidden sm:inline">Back</span>
-          </button>
+            <span className="font-sans font-semibold text-sm hidden sm:inline">Back</span>
+          </motion.button>
 
           <div className="text-center">
-            <h2 className="text-lg font-serif font-semibold text-charcoal">
-              {filteredDestinations.length} Destinations
+            <h2 className="text-lg font-serif text-charcoal" style={{ letterSpacing: '-0.02em' }}>
+              <motion.span key={filteredDestinations.length} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
+                {filteredDestinations.length} Destinations
+              </motion.span>
             </h2>
-            <p className="text-xs text-charcoal-light/60">
+            <p className="text-xs font-sans" style={{ color: 'rgba(74,74,74,0.45)' }}>
               within ₹{budgetValue.toLocaleString('en-IN')} · {tripDays} days
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`p-2 rounded-lg transition-all duration-300 ${showFilters ? 'bg-charcoal text-warm-white' : 'text-charcoal-light hover:bg-beige/60'
-                }`}
-            >
-              <Filter className="w-4 h-4" />
-            </button>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-sandstone/50" />
-              <div className="w-2 h-2 rounded-full bg-terracotta" />
-              <div className="w-2 h-2 rounded-full bg-sandstone/40" />
-            </div>
+          <div className="flex items-center gap-2">
+            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setShowList(!showList)}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-beige/50 hover:bg-beige text-charcoal transition-colors"
+              style={{ display: 'flex' }}>
+              {showList ? <X className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
+            </motion.button>
           </div>
         </div>
       </motion.div>
 
-      {/* Filter Panel */}
+      {/* ═══ Destination List Drawer ═══ */}
       <AnimatePresence>
-        {showFilters && (
+        {showList && currentStep === 2 && (
           <motion.div
-            initial={{ opacity: 0, y: -10, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: -10, height: 0 }}
-            transition={{ duration: 0.3 }}
-            className="absolute top-[72px] left-0 right-0 glass-panel border-t border-sandstone/15 px-4 py-3 z-10"
-            style={{ pointerEvents: 'auto' }}
+            initial={{ x: 300, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 300, opacity: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute top-[72px] right-0 bottom-0 w-[320px] glass-panel-heavy z-20 overflow-y-auto scrollbar-hide"
+            style={{ position: 'absolute', pointerEvents: 'auto', borderLeft: '1px solid var(--glass-border)' }}
           >
-            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-2">
-              {([
-                { id: 'nature' as TripCategory, label: 'Nature', icon: <Mountain className="w-3.5 h-3.5" /> },
-                { id: 'culture' as TripCategory, label: 'Culture', icon: <Landmark className="w-3.5 h-3.5" /> },
-                { id: 'adventure' as TripCategory, label: 'Adventure', icon: <Compass className="w-3.5 h-3.5" /> },
-                { id: 'relaxation' as TripCategory, label: 'Relaxation', icon: <Palmtree className="w-3.5 h-3.5" /> },
-              ]).map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => toggleCategory(cat.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${selectedCategories.includes(cat.id)
-                    ? 'bg-charcoal text-warm-white'
-                    : 'bg-beige/60 text-charcoal-light hover:bg-sandstone/30'
-                    }`}
-                >
-                  {cat.icon}
-                  {cat.label}
-                </button>
-              ))}
+            <div className="p-4">
+              <h3 className="font-serif text-base text-charcoal mb-3">All Destinations</h3>
+              <div className="space-y-2">
+                {filteredDestinations.map(dest => {
+                  const dayFit = getDayFitColor(dest, tripDays)
+                  return (
+                    <motion.button key={dest.id} whileHover={{ scale: 1.02, x: 4 }} whileTap={{ scale: 0.97 }}
+                      onClick={() => {
+                        setSelectedCard(dest)
+                        setShowList(false)
+                        mapRef?.flyTo({ center: [dest.location.lng, dest.location.lat], zoom: 9, duration: 2000 })
+                      }}
+                      className="w-full glass-panel p-3 flex items-center gap-3 text-left"
+                      style={{ borderRadius: '14px' }}>
+                      {dest.imageUrl && !imgErrors.has(dest.id + '-list') ? (
+                        <img src={dest.imageUrl} alt={dest.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
+                          onError={() => setImgErrors(prev => new Set(prev).add(dest.id + '-list'))} />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-beige/50 flex items-center justify-center flex-shrink-0">
+                          <MapPin className="w-5 h-5 text-sandstone" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-serif text-sm text-charcoal truncate">{dest.name}</p>
+                        <p className="text-[11px] font-sans text-charcoal-light/40">{dest.state}</p>
+                        <div className="flex items-center gap-2 mt-1 text-[10px] font-sans" style={{ color: 'rgba(74,74,74,0.5)' }}>
+                          <span>₹{dest.tripDetails.estimatedCost.toLocaleString('en-IN')}</span>
+                          <span>·</span>
+                          <span>{dest.tripDetails.minDays}-{dest.tripDetails.maxDays}d</span>
+                        </div>
+                      </div>
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: dayFit.color }} />
+                    </motion.button>
+                  )
+                })}
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Budget & Duration Chips */}
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: currentStep === 2 ? 1 : 0, x: currentStep === 2 ? 0 : -20 }}
-        transition={{ delay: 0.5, duration: 0.6 }}
-        className="absolute top-20 left-4 glass-panel rounded-2xl px-4 py-2.5 z-10"
-        style={{ pointerEvents: 'auto' }}
-      >
-        <p className="text-[10px] text-charcoal-light/50 mb-0.5">Budget</p>
-        <p className="text-base font-serif font-semibold text-charcoal">
-          ₹{budgetValue.toLocaleString('en-IN')}
-        </p>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: currentStep === 2 ? 1 : 0, x: currentStep === 2 ? 0 : 20 }}
-        transition={{ delay: 0.6, duration: 0.6 }}
-        className="absolute top-20 right-4 glass-panel rounded-2xl px-4 py-2.5 z-10"
-        style={{ pointerEvents: 'auto' }}
-      >
-        <p className="text-[10px] text-charcoal-light/50 mb-0.5">Duration</p>
-        <p className="text-base font-serif font-semibold text-charcoal">{tripDays} Days</p>
-      </motion.div>
-
-      {/* Hover Tooltip */}
+      {/* ═══ Hover Tooltip — positioned near the pin ═══ */}
       <AnimatePresence>
-        {hoveredDestination && !selectedCard && (
+        {hoveredDestination && !selectedCard && hoverPosition && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ duration: 0.2 }}
-            className="absolute bottom-24 left-1/2 -translate-x-1/2 glass-panel rounded-2xl p-5 z-20 min-w-[300px] max-w-[360px]"
+            initial={{ opacity: 0, y: 8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed glass-panel-heavy p-4 z-20 w-[280px]"
+            style={{
+              borderRadius: '20px', pointerEvents: 'none',
+              left: Math.min(Math.max(hoverPosition.x + 20, 300), window.innerWidth - 300),
+              top: Math.max(Math.min(hoverPosition.y - 80, window.innerHeight - 300), 80),
+            }}
           >
-            <div className="flex items-start gap-4">
-              <div
-                className="w-3 h-3 rounded-full mt-1.5 flex-shrink-0"
-                style={{
-                  backgroundColor: getDayFitColor(hoveredDestination, tripDays).color,
-                  boxShadow: `0 0 8px ${getDayFitColor(hoveredDestination, tripDays).color}80`,
-                }}
-              />
+            {hoveredDestination.imageUrl && !imgErrors.has(hoveredDestination.id) && (
+              <div className="w-full h-24 rounded-xl overflow-hidden mb-3" style={{ background: 'var(--beige)' }}>
+                <img src={hoveredDestination.imageUrl} alt={hoveredDestination.name}
+                  className="w-full h-full object-cover"
+                  onError={() => setImgErrors(prev => new Set(prev).add(hoveredDestination.id))} />
+              </div>
+            )}
+            <div className="flex items-start gap-2.5">
+              <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0"
+                style={{ backgroundColor: getDayFitColor(hoveredDestination, tripDays).color,
+                  boxShadow: `0 0 6px ${getDayFitColor(hoveredDestination, tripDays).color}80` }} />
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <h3 className="font-serif font-semibold text-lg text-charcoal">
-                    {hoveredDestination.name}
-                  </h3>
-                  <span className="flex-shrink-0 flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full bg-beige/60">
-                    {categoryIcons[hoveredDestination.tripDetails.category]}
-                    <span className="capitalize text-charcoal-light/70">
-                      {hoveredDestination.tripDetails.category}
-                    </span>
-                  </span>
+                <h3 className="font-serif text-base text-charcoal" style={{ letterSpacing: '-0.02em' }}>
+                  {hoveredDestination.name}
+                </h3>
+                <p className="text-[11px] font-sans" style={{ color: 'rgba(74,74,74,0.45)' }}>{hoveredDestination.state}</p>
+                <div className="flex items-center gap-3 text-xs mt-1.5 mb-2 font-sans" style={{ color: 'rgba(74,74,74,0.6)' }}>
+                  <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{hoveredDestination.tripDetails.minDays}-{hoveredDestination.tripDetails.maxDays}d</span>
+                  <span className="flex items-center gap-1"><IndianRupee className="w-3 h-3" />₹{hoveredDestination.tripDetails.estimatedCost.toLocaleString('en-IN')}</span>
                 </div>
-
-                <p className="text-xs text-charcoal-light/50 mb-2">{hoveredDestination.state}</p>
-
-                <div className="flex items-center gap-3 text-sm text-charcoal-light/70 mb-3">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {hoveredDestination.tripDetails.minDays}-{hoveredDestination.tripDetails.maxDays} days
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <IndianRupee className="w-3.5 h-3.5" />
-                    {hoveredDestination.tripDetails.estimatedCost.toLocaleString('en-IN')}
-                  </span>
-                </div>
-
-                <div
-                  className="text-xs px-2.5 py-1 rounded-lg mb-3 inline-flex items-center gap-1.5"
-                  style={{
+                <div className="text-[10px] px-2 py-0.5 mb-2 inline-flex items-center gap-1 font-sans font-medium"
+                  style={{ borderRadius: '8px',
                     backgroundColor: `${getDayFitColor(hoveredDestination, tripDays).color}15`,
-                    color: getDayFitColor(hoveredDestination, tripDays).color,
-                  }}
-                >
-                  <Clock className="w-3 h-3" />
-                  {tripDays} days — {getDayFitColor(hoveredDestination, tripDays).label}
+                    color: getDayFitColor(hoveredDestination, tripDays).color }}>
+                  <Clock className="w-2.5 h-2.5" />
+                  {getDayFitColor(hoveredDestination, tripDays).label}
                 </div>
-
-                <div className="space-y-1">
-                  {hoveredDestination.tripDetails.highlights.map((h) => (
-                    <div key={h} className="text-xs text-charcoal-light/60 flex items-center gap-1.5">
-                      <span className="text-gold">✓</span>
-                      {h}
+                <div className="space-y-0.5">
+                  {hoveredDestination.tripDetails.highlights.slice(0, 3).map(h => (
+                    <div key={h} className="text-[11px] font-sans flex items-center gap-1" style={{ color: 'rgba(74,74,74,0.5)' }}>
+                      <span className="text-gold">✓</span>{h}
                     </div>
                   ))}
                 </div>
@@ -386,103 +473,83 @@ export default function MapView() {
         )}
       </AnimatePresence>
 
-      {/* Selected Destination Modal */}
+      {/* ═══ Selected Destination Modal ═══ */}
       <AnimatePresence>
         {selectedCard && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-charcoal/30 backdrop-blur-sm flex items-center justify-center z-30 p-4"
-            style={{ pointerEvents: 'auto' }}
-            onClick={resetMapView}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-30 flex items-center justify-center p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) resetMapView() }}
+            style={{ pointerEvents: 'auto', background: 'rgba(44,44,44,0.15)', backdropFilter: 'blur(4px)' }}
           >
             <motion.div
-              initial={{ y: 40, opacity: 0, scale: 0.95 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 40, opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-              className="glass-panel rounded-3xl p-8 md:p-10 max-w-lg w-full"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ scale: 0.92, y: 30, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.92, y: 30, opacity: 0 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="glass-panel-heavy w-full max-w-lg p-7"
+              style={{ borderRadius: '28px', maxHeight: '85vh', overflowY: 'auto' }}
             >
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h2 className="text-3xl font-serif font-bold text-charcoal mb-1">
+                  {selectedCard.imageUrl && !imgErrors.has(selectedCard.id + '-modal') && (
+                    <div className="w-full h-40 rounded-2xl overflow-hidden mb-5" style={{ background: 'var(--beige)' }}>
+                      <img src={selectedCard.imageUrl} alt={selectedCard.name}
+                        className="w-full h-full object-cover"
+                        onError={() => setImgErrors(prev => new Set(prev).add(selectedCard.id + '-modal'))} />
+                    </div>
+                  )}
+                  <h2 className="text-3xl font-serif text-charcoal mb-1" style={{ letterSpacing: '-0.02em' }}>
                     {selectedCard.name}
                   </h2>
-                  <p className="text-sm text-charcoal-light/50">{selectedCard.state}</p>
-                  <div className="flex items-center gap-3 mt-2 text-charcoal-light/70 text-sm">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      {selectedCard.tripDetails.minDays}-{selectedCard.tripDetails.maxDays} days
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <IndianRupee className="w-4 h-4" />
-                      {selectedCard.tripDetails.estimatedCost.toLocaleString('en-IN')}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-gold" />
-                      {selectedCard.popularityScore}%
-                    </span>
+                  <p className="text-sm font-sans" style={{ color: 'rgba(74,74,74,0.45)' }}>{selectedCard.state}</p>
+                  <div className="flex items-center gap-3 mt-2 text-sm font-sans" style={{ color: 'rgba(74,74,74,0.6)' }}>
+                    <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{selectedCard.tripDetails.minDays}-{selectedCard.tripDetails.maxDays} days</span>
+                    <span className="flex items-center gap-1"><IndianRupee className="w-4 h-4" />₹{selectedCard.tripDetails.estimatedCost.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
-                <button
-                  onClick={resetMapView}
-                  className="text-charcoal-light/40 hover:text-charcoal transition-colors p-1"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={resetMapView}
+                  className="w-8 h-8 rounded-full bg-beige/60 flex items-center justify-center hover:bg-beige transition-colors flex-shrink-0">
+                  <X className="w-4 h-4 text-charcoal" />
+                </motion.button>
               </div>
 
-              {/* Day Fit Badge */}
-              <div
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium mb-6"
-                style={{
-                  backgroundColor: `${getDayFitColor(selectedCard, tripDays).color}15`,
-                  color: getDayFitColor(selectedCard, tripDays).color,
-                }}
-              >
-                <Clock className="w-4 h-4" />
-                {tripDays} days available — {getDayFitColor(selectedCard, tripDays).label}
-              </div>
-
-              {/* Highlights */}
               <div className="mb-6">
-                <h3 className="font-medium text-charcoal text-xs mb-3 tracking-wide uppercase">Highlights</h3>
+                <h3 className="font-sans font-semibold text-charcoal text-sm mb-3">Highlights</h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedCard.tripDetails.highlights.map(h => (
+                    <span key={h} className="text-xs font-sans px-3 py-1.5 bg-beige/60" style={{ borderRadius: '9999px', color: 'rgba(74,74,74,0.6)' }}>✨ {h}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="font-sans font-semibold text-charcoal text-sm mb-3">Top Places</h3>
                 <div className="space-y-2">
-                  {selectedCard.tripDetails.highlights.map((h) => (
-                    <div key={h} className="flex items-center gap-3 text-charcoal-light">
-                      <span className="text-gold text-sm">✓</span>
-                      <span className="text-sm">{h}</span>
+                  {selectedCard.pois.slice(0, 5).map(poi => (
+                    <div key={poi.id} className="glass-panel p-3 flex items-center gap-3" style={{ borderRadius: '14px' }}>
+                      <div className="w-8 h-8 rounded-lg bg-beige/60 flex items-center justify-center text-sm">
+                        {poi.type === 'food' ? '🍽️' : poi.type === 'activity' ? '🏔️' : '📸'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-sans font-medium text-charcoal truncate">{poi.name}</p>
+                        <p className="text-[11px] font-sans line-clamp-1" style={{ color: 'rgba(74,74,74,0.45)' }}>{poi.description}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs font-sans font-semibold text-charcoal tabular-nums">{poi.estimatedCost > 0 ? `₹${poi.estimatedCost}` : 'Free'}</p>
+                        <div className="flex items-center gap-0.5 mt-0.5"><Star className="w-2.5 h-2.5 text-soft-gold" /><span className="text-[10px] font-sans text-charcoal-light/50">{poi.rating}</span></div>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Top POIs */}
-              <div className="mb-8">
-                <h3 className="font-medium text-charcoal text-xs mb-3 tracking-wide uppercase">Top Places</h3>
+              <div className="mb-6">
+                <h3 className="font-sans font-semibold text-charcoal text-sm mb-3">Best For</h3>
                 <div className="flex flex-wrap gap-2">
-                  {selectedCard.pois.slice(0, 4).map((poi) => (
-                    <div key={poi.id} className="bg-beige/50 px-3 py-1.5 rounded-lg text-xs text-charcoal-light">
-                      <MapPin className="w-3 h-3 inline mr-1 text-gold" />
-                      {poi.name}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Best For Tags */}
-              <div className="mb-8">
-                <div className="flex flex-wrap gap-2">
-                  {selectedCard.tripDetails.bestFor.map((bt) => (
-                    <span
-                      key={bt}
-                      className={`text-xs px-2.5 py-1 rounded-full capitalize ${bt === tripType
-                        ? 'bg-gold/20 text-charcoal font-medium border border-gold/30'
-                        : 'bg-beige/40 text-charcoal-light/60'
-                        }`}
-                    >
+                  {selectedCard.tripDetails.bestFor.map(bt => (
+                    <span key={bt}
+                      className={`text-xs font-sans px-3 py-1.5 capitalize ${bt === tripType ? 'bg-charcoal text-warm-white font-semibold' : 'bg-beige/40 text-charcoal-light/60'}`}
+                      style={{ borderRadius: '9999px' }}>
                       {bt}
                     </span>
                   ))}
@@ -490,22 +557,14 @@ export default function MapView() {
               </div>
 
               <div className="flex gap-3">
-                <button
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                   onClick={resetMapView}
-                  className="flex-1 py-3.5 px-6 border border-sandstone/50 rounded-xl font-medium text-sm text-charcoal hover:border-terracotta/50 transition-all duration-300"
-                >
+                  className="btn-secondary flex-1 py-3.5 px-6 text-sm" style={{ borderRadius: '16px' }}>
                   Other Options
-                </button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                </motion.button>
+                <motion.button whileHover={{ scale: 1.02, y: -1 }} whileTap={{ scale: 0.97 }}
                   onClick={() => handleSelectDestination(selectedCard)}
-                  className="flex-1 py-3.5 px-6 rounded-xl font-medium text-sm text-warm-white transition-all duration-300"
-                  style={{
-                    background: 'linear-gradient(135deg, #C4734F 0%, #C9A96E 100%)',
-                    boxShadow: '0 4px 16px rgba(196, 115, 79, 0.3)',
-                  }}
-                >
+                  className="btn-primary flex-1 py-3.5 px-6 text-sm" style={{ borderRadius: '16px' }}>
                   Build Itinerary →
                 </motion.button>
               </div>
@@ -514,53 +573,22 @@ export default function MapView() {
         )}
       </AnimatePresence>
 
-      {/* Legend */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: currentStep === 2 ? 1 : 0, y: currentStep === 2 ? 0 : 20 }}
-        transition={{ delay: 0.8, duration: 0.6 }}
-        className="absolute bottom-8 left-4 glass-panel rounded-2xl p-4 z-10"
-        style={{ pointerEvents: 'auto' }}
-      >
-        <h3 className="font-medium text-charcoal mb-2.5 text-xs tracking-wide uppercase">
-          Day Compatibility
-        </h3>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-full bg-green-500 border-2 border-warm-white" />
-            <span className="text-charcoal-light/70">Comfortable</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-full bg-yellow-500 border-2 border-warm-white" />
-            <span className="text-charcoal-light/70">Slightly hectic</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-full bg-orange-500 border-2 border-warm-white" />
-            <span className="text-charcoal-light/70">Too tight</span>
-          </div>
-        </div>
-      </motion.div>
-
       {/* No destinations message */}
       {filteredDestinations.length === 0 && mapLoaded && currentStep === 2 && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass-panel rounded-2xl p-8 z-10 text-center max-w-sm"
-          style={{ pointerEvents: 'auto' }}
+          initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass-panel-heavy p-8 z-10 text-center max-w-sm"
+          style={{ position: 'absolute', pointerEvents: 'auto', borderRadius: '28px' }}
         >
-          <p className="text-2xl mb-2">😔</p>
-          <h3 className="font-serif font-semibold text-lg text-charcoal mb-2">No trips found</h3>
-          <p className="text-sm text-charcoal-light/60 mb-4">
-            Try adjusting your budget, days, or filters to discover more destinations.
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
+            className="w-16 h-16 mx-auto mb-4 rounded-full bg-beige/60 flex items-center justify-center">
+            <Search className="w-7 h-7 text-sandstone" />
+          </motion.div>
+          <h3 className="font-serif text-lg text-charcoal mb-2">No destinations found</h3>
+          <p className="text-sm font-sans" style={{ color: 'rgba(74,74,74,0.4)' }}>
+            Try increasing your budget or adjusting filters
           </p>
-          <button
-            onClick={goToPreviousStep}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-warm-white"
-            style={{ background: 'linear-gradient(135deg, #C4734F 0%, #C9A96E 100%)' }}
-          >
-            Adjust Preferences
-          </button>
         </motion.div>
       )}
     </div>
