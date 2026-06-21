@@ -7,12 +7,28 @@ import BudgetFilter from '@/components/BudgetFilter'
 import MapView from '@/components/MapView'
 import ItineraryBuilder from '@/components/ItineraryBuilder'
 import { motion, AnimatePresence } from 'framer-motion'
+import Link from 'next/link'
+import { Users } from 'lucide-react'
 
 export default function Home() {
   const { currentStep, isTransitioning } = useTravelStore()
 
   return (
     <main className="min-h-screen bg-ivory" style={{ position: 'relative', overflow: 'hidden' }}>
+      {/* Floating Community entry point */}
+      <Link href="/community">
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 3, duration: 0.6 }}
+          whileHover={{ scale: 1.05, y: -1 }}
+          whileTap={{ scale: 0.95 }}
+          className="fixed top-4 right-4 z-[60] glass-panel rounded-full px-4 py-2.5 flex items-center gap-2 cursor-pointer shadow-lg hover:shadow-xl transition-shadow"
+        >
+          <Users className="w-4 h-4 text-terracotta" />
+          <span className="text-xs font-medium text-charcoal tracking-wide">Community</span>
+        </motion.div>
+      </Link>
       {/* Persistent Mapbox — always rendered, never unmounted */}
       <PersistentMap />
 
